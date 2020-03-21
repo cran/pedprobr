@@ -1,31 +1,43 @@
 #' Pedigree likelihood computed by MERLIN
 #'
-#' This function is a wrapper of the "--likelihood" functionality of the MERLIN
-#' software. It computes the total likelihood of the pedigree given the
-#' indicated marker data. For this function to work, MERLIN must be installed
-#' and correctly pointed to in the PATH variable.
+#' For this functions to work, the program MERLIN (see References below) must be
+#' installed and correctly pointed to in the PATH variable. The `merlin()`
+#' function is a general wrapper which runs MERLIN with the indicated options,
+#' after creating the appropriate input files. For convenience, MERLIN's
+#' "--likelihood" functionality is wrapped in a separate function.
 #'
-#' By default the following MERLIN command is run via [system()], after creating
-#' appropriate files in the current working directory:
+#' The `merlin()` function creates input files "_merlin.ped", "_merlin.dat",
+#' "_merlin.map" and "_merlin.freq" in the `dir` directory, and then runs the
+#' following command through a call to [system()]:
 #'
-#' \preformatted{% merlin -p _merlin.ped -d _merlin.dat -m _merlin.map -f
-#' _merlin.freq --likelihood --bits:100 --megabytes:4000 --quiet }
+#' \preformatted{merlin -p _merlin.ped -d _merlin.dat -m _merlin.map -f
+#' _merlin.freq  <options> }
 #'
-#' @param x a [`ped`] object
+#' `likelihoodMerlin()` first runs `merlin()` with `options = "--likelihood
+#' --bits:100 --megabytes:4000 --quiet"`, and then extracts the likelihood
+#' values from the MERLIN output. Note that the output is the *total* likelihood
+#' including all markers.
+#'
+#' @param x a [`ped`] object.
+#' @param options a single string containing all arguments to merlin except for
+#'   the input file indications.
 #' @param markers a vector of names or indices of markers attached to `x`.
 #'   (Default: all markers).
-#' @param logbase a positive number, or NULL. If numeric, the log-likelihood is
-#'   returned, with `logbase` as basis for the logarithm.
 #' @param verbose a logical.
-#' @param generateFiles a logical. If TRUE, input files to MERLIN named
-#'   '_merlin.ped', '_merlin.dat', '_merlin.map', and '_merlin.freq' are created
-#'   in the current directory. If FALSE, no files are created.
-#' @param cleanup a logical. If TRUE, the MERLIN input files are deleted after
-#'   the call to MERLIN.
+#' @param generateFiles a logical. If TRUE (default), input files to MERLIN
+#'   named '_merlin.ped', '_merlin.dat', '_merlin.map', and '_merlin.freq' are
+#'   created in the directory indicated by `dir`. If FALSE, no files are
+#'   created.
+#' @param cleanup a logical. If TRUE (default), the MERLIN input files are
+#'   deleted after the call to MERLIN.
+#' @param dir the name of the directory where input files should be written.
 #' @param logfile a character. If this is given, the MERLIN screen output will
-#'   be written to a file with this name.
+#'   be dumped to a file with this name.
 #'
-#' @return A number.
+#' @return `merlin()` returns the screen output of MERLIN invisibly.
+#'
+#'   `likelihoodMerlin()` returns a single number; the total likelihood using
+#'   all indicated markers.
 #'
 #' @author Magnus Dehli Vigeland
 #' @references <http://csg.sph.umich.edu/abecasis/Merlin/>
@@ -36,111 +48,117 @@
 #' ### Requires MERLIN to be installed ###
 #'
 #' x = nuclearPed(1)
-#' m = marker(x, "3" = 1:2)
-#' x = setMarkers(x, m)
+#' m1 = marker(x, "1" = 1:2)           # likelihood = 1/2
+#' m2 = marker(x, "1" = 1, "3" = 1:2)    # likelihood = 1/8
+#' x = setMarkers(x, list(m1,m2))
 #'
 #' # Likelihood computation by MERLIN:
-#' likelihoodMerlin(x)
+#' likelihoodMerlin(x, verbose = FALSE)
+#' likelihoodMerlin(x, markers = 1, verbose = FALSE)
 #' }
 #'
 #' @export
-likelihoodMerlin = function(x, markers = seq_len(nMarkers(x)), logbase = NULL,
-                            verbose = FALSE, generateFiles = TRUE,
-                            cleanup = generateFiles, logfile = "") {
-  if(!is.ped(x)) stop2("Input is not a `ped` object")
-  if(!is.null(logbase) && (!is.numeric(logbase) || length(logbase) != 1 || logbase <= 0))
-    stop2("`logbase` must be a single positive number: ", logbase)
+merlin = function(x, options, markers = NULL, verbose = TRUE,
+                  generateFiles = TRUE, cleanup = TRUE, dir = tempdir(),
+                  logfile = NULL) {
+  #if(!is.ped(x)) stop2("Input is not a `ped` object")
 
   # Select markers
-  if (nMarkers(x) == 0)
+  if (!hasMarkers(x))
     stop2("Pedigree has no attached markers")
+  if(is.null(markers))
+    markers = seq_len(nMarkers(x))
   x = selectMarkers(x, markers)
 
   # MERLIN or MINX?
-  xchrom = vapply(x$MARKERS, isXmarker, FUN.VALUE = FALSE)
+  xchrom = isXmarker(x)
   if(all(xchrom)) {
-    message("All markers are X-linked; calling MINX")
+    if(verbose) cat("All markers are X-linked; calling MINX\n")
     program = "minx"
   }
   else if(all(!xchrom)) {
-    message("All markers are autosomal; calling MERLIN")
     program = "merlin"
   }
   else
     stop2("Both autosomal and X-linked markers are selected\n",
           "Please use the `markers` argument to run these in separate calls")
 
+  prefix = file.path(dir, "_merlin")
   # Generate input files to MERLIN/MINX
   if (generateFiles) {
-    files = writePed(x, prefix = "_merlin", merlin = TRUE,
-                      what = c("ped", "dat", "map", "freq"), verbose = verbose)
+    files = writePed(x, prefix = prefix, merlin = TRUE,
+                     what = c("ped", "dat", "map", "freq"), verbose = verbose)
+
+    if(cleanup)
+      on.exit({unlink(files); if (verbose) cat("MERLIN input files removed\n")})
   }
 
-  # Utility for cleaning up afterwards
-  clean = function(cleanup, verbose, files)
-    if (cleanup) {
-      unlink(files)
-      if (verbose)  message("Temporary files removed")
-    }
-
-  command = paste(program,
-                  "-p _merlin.ped",
-                  "-d _merlin.dat",
-                  "-m _merlin.map",
-                  "-f _merlin.freq",
-                  "--likelihood",
-                  "--bits:100",
-                  "--megabytes:4000",
-                  "--quiet")
+  commandArgs = c(program,
+                  sprintf("-p %s.ped", prefix),
+                  sprintf("-d %s.dat", prefix),
+                  sprintf("-m %s.map", prefix),
+                  sprintf("-f %s.freq", prefix),
+                  options)
+  command = paste(commandArgs, collapse = " ")
 
   if (verbose)
-    message("\nExecuting the following command:\n", command, "\n")
+    cat("\nExecuting the following command:\n", paste0(commandArgs, collapse = "\n "), "\n", sep = "")
 
   # Run MERLIN and store output
   mout = suppressWarnings(system(command, intern = TRUE))
 
-  # Clean up
-  clean(cleanup, verbose, files)
-
   # Write logfile if indicated
-  if (nzchar(logfile))
+  if (!is.null(logfile))
     write(mout, logfile)
 
   if (any(substr(mout, 1, 11) == "FATAL ERROR")) {
     warning(paste0(mout, collapse = "\n"), "\nFATAL ERROR reported by merlin")
-    return(invisible())
   }
+  else if (verbose) cat("\nMERLIN run completed\n")
 
-  if (verbose) message("MERLIN run completed")
+  invisible(mout)
+}
 
+#' @param ... Further arguments passed on to `merlin`
+#'
+#' @rdname merlin
+#' @export
+likelihoodMerlin = function(x, ...) {
+
+  # Run MERLIN
+  args = "--likelihood --bits:100 --megabytes:4000 --quiet"
+  mout = merlin(x, args, ...)
+
+  # Catch possible error
   if (!is.na(skipped <- which(substr(mout, 3, 9) == "SKIPPED")[1]))
     stop2(paste(mout[c(skipped - 1, skipped)], collapse = "\n"))
 
-  # Extract likelihood value
+  # Different chromosomes?
   chromLines = which(substr(mout, 1, 20) == "Analysing Chromosome")
-  likLines = which(substr(mout, 1, 27) == "lnLikelihood for 1 families")
 
+  # Lines with loglik results
+  nFam = if(is.pedList(x)) length(x) else 1
+  likLines = which(substr(mout, 1, 27) == sprintf("lnLikelihood for %d families", nFam))
+
+  # If single output value: Return likelihood
   if(length(chromLines) == 0 && length(likLines) == 1) {
     lnlik = as.numeric(strsplit(mout[likLines]," = ")[[1]][2])
-    if(!is.null(logbase))
-      return(lnlik * log(exp(1), logbase))
-    else
-      return(exp(lnlik))
+    return(exp(lnlik))
   }
 
-  if(!length(chromLines) == length(likLines))
-    stop2(mout)
+  #---------------
+  # Otherwise: Return total likelihood
+  #---------------
   message("NB: Several chromosomes - output is total likelihood.")
 
-  # Not used yet
-  # nchars = nchar(mout)
-  # chroms = as.numeric(substr(mout[chromLines], 22, nchars[chromLines]))
+  if(length(chromLines) != length(likLines))
+    stop2(mout)
 
   # Extract log-likelihoods
   lnliks = as.numeric(unlist(lapply(strsplit(mout[likLines]," = "), '[', 2)))
 
+  # Return total
   total = sum(lnliks)
   return(round(exp(total), 3))
 }
-
 
