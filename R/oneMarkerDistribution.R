@@ -126,28 +126,18 @@ oneMarkerDistribution = function(x, ids, partialmarker, loop_breakers = NULL,
     probs.subset[, sx == 1] = match(probs.subset[, sx == 1], homoz)
   }
 
-  ### Likelihood setup
-
-  # Ensure peeling order is set (otherwise it is done multiple times)
-  if(is.null(attr(x, "PEELING_ORDER")))
-    attr(x, "PEELING_ORDER") = peelingOrder(x)
-
-  # Precompute informative nucs
-  mDummy = m
-  mDummy[int.ids, ] = 1
-  inform = informativeSubnucs(x, mDummy)
-  setup = list(informativeNucs = inform$subnucs,
-               treatAsFounder = inform$newfounders)
-
   # Compute marginal
   marginal = likelihood(x, marker1 = m, eliminate = eliminate)
   if (marginal == 0)
       stop2("Partial marker is impossible")
 
-  probs[probs.subset] = apply(grid.subset, 1, function(allg_rows) {
-      m[int.ids, ] = allgenos[allg_rows, ]
-      likelihood(x, marker1 = m, eliminate = eliminate, setup = setup)
-  })
+  # Create list of all markers
+  mlist = lapply(1:nrow(grid.subset), function(i) {
+    r = grid.subset[i,]
+    m[int.ids, ] = allgenos[r, ]; m})
+
+  # Calculate likelihoods and insert in result array
+  probs[probs.subset] = likelihood(x, mlist, eliminate = eliminate)
 
   res = probs/marginal
   if (verbose) {
