@@ -3,20 +3,33 @@
 \name{merlin}
 \alias{merlin}
 \alias{likelihoodMerlin}
+\alias{checkMerlin}
 \title{Pedigree likelihood computed by MERLIN}
 \usage{
 merlin(
   x,
   options,
   markers = NULL,
+  linkageMap = NULL,
   verbose = TRUE,
   generateFiles = TRUE,
   cleanup = TRUE,
   dir = tempdir(),
-  logfile = NULL
+  logfile = NULL,
+  merlinpath = NULL
 )
 
-likelihoodMerlin(x, ...)
+likelihoodMerlin(
+  x,
+  markers = NULL,
+  linkageMap = NULL,
+  rho = NULL,
+  logbase = NULL,
+  options = "--likelihood --bits:100 --megabytes:4000 --quiet",
+  ...
+)
+
+checkMerlin()
 }
 \arguments{
 \item{x}{a \code{\link{ped}} object.}
@@ -26,6 +39,9 @@ the input file indications.}
 
 \item{markers}{a vector of names or indices of markers attached to \code{x}.
 (Default: all markers).}
+
+\item{linkageMap}{a data frame with three columns (chromosome; marker name;
+centiMorgan position) to be used as the marker map by MERLIN.}
 
 \item{verbose}{a logical.}
 
@@ -42,17 +58,30 @@ deleted after the call to MERLIN.}
 \item{logfile}{a character. If this is given, the MERLIN screen output will
 be dumped to a file with this name.}
 
-\item{...}{Further arguments passed on to \code{merlin}}
+\item{merlinpath}{the path to the folder containing the merlin executables.
+If the executables are on the system's search path, this can be left as
+NULL (default).}
+
+\item{rho}{A vector of length one less than the number of markers, specifying
+the recombination rate between each consecutive pair.}
+
+\item{logbase}{Either NULL (default) or a positive number indicating the
+basis for logarithmic output. Typical values are \code{exp(1)} and 10.}
+
+\item{...}{Further arguments passed on to \code{merlin()}.}
 }
 \value{
 \code{merlin()} returns the screen output of MERLIN invisibly.
 
 \code{likelihoodMerlin()} returns a single number; the total likelihood using
 all indicated markers.
+
+\code{checkMerlin()} returns TRUE if MERLIN is installed and available on the
+system path, and FALSE otherwise.
 }
 \description{
-For this functions to work, the program MERLIN (see References below) must be
-installed and correctly pointed to in the PATH variable. The \code{merlin()}
+For these functions to work, the program MERLIN (see References below) must
+be installed and correctly pointed to in the PATH variable. The \code{merlin()}
 function is a general wrapper which runs MERLIN with the indicated options,
 after creating the appropriate input files. For convenience, MERLIN's
 "--likelihood" functionality is wrapped in a separate function.
@@ -68,30 +97,50 @@ _merlin.freq  <options> }
 \code{likelihoodMerlin()} first runs \code{merlin()} with \code{options = "--likelihood --bits:100 --megabytes:4000 --quiet"}, and then extracts the likelihood
 values from the MERLIN output. Note that the output is the \emph{total} likelihood
 including all markers.
+
+For likelihood computations with linked markers, the argument \code{rho} should
+indicate the recombination fractions between each consecutive pair of markers
+(i.e., \code{rho[i]} is the recombination rate between markers \code{i-1} and \code{i}).
+These will be converted to centiMorgan distances using Haldane's map
+function, and used to create genetic marker map in a MERLIN-friendly format.
 }
 \examples{
 
-\donttest{
-### Requires MERLIN to be installed ###
+if(checkMerlin()) {
 
+### Trivial example for validation
 x = nuclearPed(1)
 m1 = marker(x, "1" = 1:2)           # likelihood = 1/2
-m2 = marker(x, "1" = 1, "3" = 1:2)    # likelihood = 1/8
-x = setMarkers(x, list(m1,m2))
+m2 = marker(x, "1" = 1, "3" = 1:2)  # likelihood = 1/8
+x = setMarkers(x, list(m1, m2))
 
-# Likelihood computation by MERLIN:
+# MERLIN likelihoods
 lik1 = likelihoodMerlin(x, markers = 1, verbose = FALSE)
 lik2 = likelihoodMerlin(x, markers = 2, verbose = FALSE)
 likTot = likelihoodMerlin(x, verbose = FALSE)
 stopifnot(all.equal(
   round(c(lik1, lik2, likTot), c(3,3,4)), c(1/2, 1/8, 1/16)))
 
+# Example with ped lists
 y = list(singleton(1), singleton(2))
-y = setMarkers(y, locus = list(alleles=1:2))
+y = setMarkers(y, locus = list(alleles = 1:2))
 genotype(y[[1]], marker = 1, id = '1') = 1:2
 genotype(y[[2]], marker = 1, id = '2') = 1
 lik = likelihoodMerlin(y, verbose = FALSE)
 stopifnot(all.equal(round(lik, 3), 1/8))
+
+### Linked markers
+z = nuclearPed(2)
+m = marker(z, geno = c("1/1", "1/2", "1/2", "1/2"))
+z = setMarkers(z, list(m, m))
+
+# By MERLIN...
+L1 = likelihoodMerlin(z, markers = 1:2, rho = 0.25, verbose = FALSE)
+
+# ...and by pedprobr
+L2 = likelihood2(z, marker1 = 1, marker2 = 2, rho = 0.25)
+
+# stopifnot(all.equal(signif(L1, 3), signif(L2, 3)))
 }
 
 }

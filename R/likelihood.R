@@ -1,8 +1,9 @@
 #' Pedigree likelihood
 #'
-#' This function is the heart of pedprobr. It computes the likelihood of a
-#' pedigree (or a list of pedigrees) given genotypes for a marker or a pair of
-#' linked markers.
+#' The `likelihood()` and `likelihood2()` functions constitute the heart of
+#' **pedprobr**. The former computes the pedigree likelihood for each indicated
+#' marker. The latter computer the likelihood for a pair of linked markers
+#' separated by a given recombination rate.
 #'
 #' The implementation is based on the peeling algorithm of Elston and Stewart
 #' (1971). A variety of situations are covered; see the Examples section for
@@ -19,37 +20,34 @@
 #' * markers with mutation models
 #'
 #' @param x A `ped` object, a `singleton` object, or a list of such objects.
-#' @param marker1 One or several markers compatible with `x`. Several input
+#' @param markers One or several markers compatible with `x`. Several input
 #'   forms are possible:
 #'
 #'   * A [marker()] object compatible with `x`.
 #'
-#'   * A list of marker objects
+#'   * A list of marker objects.
 #'
 #'   * A vector of names or indices of markers attached to `x`. If `x` is a
 #'   list, this is the only valid input.
 #'
-#' @param marker2 Either NULL, or a single marker compatible with `x`. See
-#'   Details.
+#' @param marker1,marker2 Single markers compatible with `x`.
 #' @param rho The recombination rate between `marker1` and `marker2`. To make
 #'   biological sense `rho` should be between 0 and 0.5.
 #' @param eliminate Mostly for internal use: a non-negative integer indicating
 #'   the number of iterations in the internal genotype-compatibility algorithm.
 #'   Positive values can save time if the number of alleles is large.
-#' @param logbase A numeric, or NULL. If numeric the log-likelihood is returned,
-#'   with `logbase` as basis for the logarithm.
+#' @param logbase Either NULL (default) or a positive number indicating the
+#'   basis for logarithmic output. Typical values are `exp(1)` and 10.
 #' @param loop_breakers A vector of ID labels indicating loop breakers. If NULL
 #'   (default), automatic selection of loop breakers will be performed. See
 #'   [breakLoops()].
-#' @param setup For internal use.
+#' @param peelOrder For internal use.
 #' @param verbose A logical.
-#' @param total A logical; if TRUE, the product of the likelihoods is returned,
-#'   otherwise a vector with the individual likelihoods.
-#' @param theta Deprecated; renamed to `rho`.
+#' @param theta Theta correction.
 #' @param \dots Further arguments.
 
 #' @return A numeric with the same length as the number of markers indicated by
-#'   `marker1`. If `logbase` is a positive number, the output is
+#'   `markers`. If `logbase` is a positive number, the output is
 #'   `log(likelihood, logbase)`.
 
 #' @author Magnus Dehli Vigeland
@@ -72,7 +70,7 @@
 #' plot(x, marker = 1)
 #'
 #' # Compute the likelihood
-#' lik1 = likelihood(x, marker1 = 1)
+#' lik1 = likelihood(x, markers = 1)
 #'
 #'
 #' ### Example 2: Same as above, but using founder inbreeding
@@ -87,96 +85,99 @@
 #' plot(y, marker = 1)
 #'
 #' # Likelihood should be the same as above
-#' lik2 = likelihood(y, marker1 = 1)
+#' lik2 = likelihood(y, markers = 1)
 #'
 #' stopifnot(all.equal(lik1, lik2))
 #'
 #'
-#' ### Example 3: Modelling mutations
-#' # TODO after next pedtools release
 #'
 #' @export
 likelihood = function(x, ...) UseMethod("likelihood", x)
 
-
 #' @export
 #' @rdname likelihood
-likelihood.ped = function(x, marker1 = NULL, marker2 = NULL, rho = NULL, setup = list(),
-                           eliminate = 0, logbase = NULL, loop_breakers = NULL,
-                           verbose = FALSE, theta = NULL, ...) {
+likelihood.ped = function(x, markers = NULL, peelOrder = NULL,
+                          eliminate = 0, logbase = NULL, loop_breakers = NULL,
+                          verbose = FALSE, theta = 0, ...) {
 
-  if(!is.null(theta)) {
-    message("Argument `theta` has been renamed to `rho`")
-    rho = theta
-  }
   if(hasSelfing(x))
     stop2("Likelihood of pedigrees with selfing is not implemented.\n",
           "Contact the maintainer if this is important to you.")
 
-  if(is.null(marker1))
-    marker1 = x$MARKERS
-  else if(is.marker(marker1))
-    marker1 = list(marker1)
-  else if(is.atomic(marker1))
-    marker1 = getMarkers(x, markers = marker1)
+  # Catch erroneous input
+  if(is.ped(peelOrder))
+    stop2("Invalid input for argument `peelOrder`. Received object type: ", class(peelOrder))
 
-  twolocus = !is.null(marker2)
-  if(twolocus) {
-    if(hasInbredFounders(x))
-      stop2("Likelihood of linked markers is not implemented in pedigrees with founder inbreeding.\n",
-            "(Note that this is usually not well-defined)")
-    if(is.null(rho))
-      stop2("Argument `rho` is missing")
-    if(!(is.marker(marker2) || (is.atomic(marker2) && length(marker2) == 1)))
-      stop2("Argument `marker2` must be a single marker")
-    if(!is.marker(marker2))
-      marker2 = getMarkers(x, markers = marker2)[[1]]
-  }
+  if(is.null(markers))
+    markers = x$MARKERS
+  else if(is.vector(markers) && !is.list(markers))
+    markers = getMarkers(x, markers = markers)
+  else if(is.marker(markers))
+    markers = list(markers)
+  else if(!is.markerList(markers))
+    stop2("Invalid input for argument `markers`. Received object type: ", class(markers))
+
+  if(verbose)
+    message("Number of markers: ", length(markers))
+
+  if(length(markers) == 0)
+    return(numeric(0))
 
   ### Quick calculations if singleton
   if(is.singleton(x)) {
-    liks = vapply(marker1, function(m) likelihoodSingleton(x, m), FUN.VALUE = 1)
-
-    # If two markers: Linkage is irrelevant for singletons
-    if (twolocus) {
-      lik2 = likelihoodSingleton(x, marker2)
-      liks = liks * lik2
-    }
-
+    if(verbose)
+      message("Passing to singleton method")
+    liks = vapply(markers, function(m) likelihoodSingleton(x, m, theta = theta), FUN.VALUE = 1)
     return(if(is.numeric(logbase)) log(liks, logbase) else liks)
   }
 
   # Allele lumping
-  marker1 = lapply(marker1, reduceAlleles, verbose = verbose)
-  marker2 = reduceAlleles(marker2, verbose = verbose)
+  markers = lapply(markers, reduceAlleles, verbose = verbose)
 
   # Break unbroken loops TODO: move up (avoid re-attaching)
   if (x$UNBROKEN_LOOPS) {
     if(verbose)
       message("Tip: To optimize speed, consider breaking loops before calling 'likelihood'. See ?breakLoops.")
-    mlist = if(twolocus) c(marker1, list(marker2)) else marker1
-    x = breakLoops(setMarkers(x, mlist), loop_breakers = loop_breakers, verbose = verbose)
-    marker1 = x$MARKERS[seq_along(marker1)]
-    if (twolocus)
-      marker2 = x$MARKERS[[length(x$MARKERS)]]
+    x = breakLoops(setMarkers(x, markers), loop_breakers = loop_breakers, verbose = verbose)
+    markers = x$MARKERS
   }
 
   # Peeling order: Same for all markers
-  informative = setup$informative
-  if(is.null(informative)) {
-    peelOrder = setup$peelOrder %||% peelingOrder(x)
-    informative = informativeSubnucs(x, mlist = c(marker1, list(marker2)), peelOrder = peelOrder)
+  if(is.null(peelOrder))
+    peelOrder = informativeSubnucs(x, mlist = markers, peelOrder = peelingOrder(x))
+
+  if(verbose)
+    message(sprintf("%d informative %s", length(peelOrder), if(length(peelOrder) == 1) "nucleus" else "nuclei"))
+
+  treatAsFou = attr(peelOrder, "treatAsFounder")
+
+  # Autosomal or X?
+  isX = vapply(markers, isXmarker, logical(1))
+  Xchrom = all(isX)
+  if(!Xchrom && any(isX))
+    stop2("Cannot mix autosomal and X-linked markers in the same likelihood calculation")
+  if(verbose)
+    message("Chromosome type: ", if(Xchrom) "X" else "autosomal")
+
+  # Select tools for peeling
+  # TODO: Orgainse better, e.g., skip startdata if theta > 0
+  if(Xchrom) {
+    starter = function(x, m) startdata_M_X(x, m, eliminate = eliminate, treatAsFounder = treatAsFou)
+    peeler = function(x, m) function(dat, sub) .peel_M_X(dat, sub, SEX = x$SEX, mutmat = mutmod(m))
+  }
+  else {
+    starter = function(x, m) startdata_M_AUT(x, m, eliminate = eliminate, treatAsFounder = treatAsFou)
+    peeler = function(x, m) function(dat, sub) .peel_M_AUT(dat, sub, mutmat = mutmod(m))
   }
 
-  nucs = informative$subnucs
-  treatAsFounder = informative$treatAsFounder
+  # Loop over markers
+  resList = lapply(markers, function(m) {
 
-  # Loop over markers in `marker1`
-  resList = lapply(marker1, function(m) {
-    Xchrom = isXmarker(m)
-    dat = startData(x, m, marker2, Xchrom, eliminate = eliminate, treatAsFounder = treatAsFounder)
-    peeler = choosePeeler(twolocus, rho, Xchrom = Xchrom, SEX = x$SEX, mutmat = mutmod(m))
-    peelingProcess(nucs, dat, peeler, x$LOOP_BREAKERS)
+    # If theta correction, go to different function
+    if(theta > 0)
+      likTheta(x, m, theta, peeler(x,m), peelOrder)
+    else
+      peelingProcess(x, m, starter(x,m), peeler(x,m), peelOrder)
   })
 
   res = unlist(resList)
@@ -185,69 +186,23 @@ likelihood.ped = function(x, marker1 = NULL, marker2 = NULL, rho = NULL, setup =
 }
 
 
-likelihoodSingleton = function(x, m) {
-  m1 = m[1]
-  m2 = m[2]
-
-  # Quick return if empty
-  if(m1 == 0 || m2 == 0)
-    return(1)
-
-  afr = afreq(m)
-  chromX = isXmarker(m)
-  finb = founderInbreeding(x, chromType = if(chromX) "x" else "autosomal")
-
-  if (chromX && x$SEX == 1) {
-    if (all(m > 0) && m1 != m2)
-      stop2("Heterozygous genotype at X-linked marker in male singleton")
-    res = afr[m1]
-  }
-  else if (m1 == 0 || m2 == 0) {
-    p = afr[m[m != 0]]
-    res = p^2 + 2 * p * (1 - p)
-  }
-  else {#print(list(m1, m2, afr, finb))
-    res = HWprob(m1, m2, afr, finb)
-  }
-  res
-}
-
-
-#' @export
-#' @rdname likelihood
-likelihood.list = function(x, marker1, marker2 = NULL, logbase = NULL, total = TRUE, ...) {
-  if(!is.pedList(x))
-    stop2("Input is a list, but not a list of `ped` objects")
-
-  if (!is.atomic(marker1))
-    stop2("`likelihood.list()`requires `marker1` to be a vector or marker names or indices. Received: ", class(marker1))
-  if (!is.atomic(marker2))
-    stop2("`likelihood.list()`requires `marker2` to be a vector or marker names or indices. Received: ", class(marker2))
-
-  liks = vapply(x, function(comp)
-    likelihood.ped(comp, marker1, marker2, logbase = FALSE, total = FALSE, ...),
-    FUN.VALUE = numeric(length(marker1)))
-
-  if(length(marker1) == 1)
-    dim(liks) = c(1, length(x))
-
-  if (total)
-    if(is.numeric(logbase)) sum(log(liks, logbase)) else prod(liks)
-  else
-    if(is.numeric(logbase)) rowSums(log(liks, logbase)) else apply(liks,1,prod)
-}
-
-
 
 # Internal function: likelihood of a single marker
-peelingProcess = function(nucs, startdata, peeler, LB) {
+peelingProcess = function(x, m, startdata, peeler, peelOrder = NULL) {
 
-  dat = startdata
-  if (attr(dat, "impossible"))
+  if(is.null(peelOrder))
+    peelOrder = informativeSubnucs(x, m)
+
+  if(is.function(startdata))
+    startdata = startdata(x, m)
+
+  if(attr(startdata, "impossible"))
     return(0)
 
-  if (is.null(LB)) { # If no loops
-    for (nuc in nucs) {
+  dat = startdata
+
+  if (is.null(x$LOOP_BREAKERS)) { # If no loops
+    for (nuc in peelOrder) {
       dat = peeler(dat, nuc)
       if (nuc$link > 0 && attr(dat, "impossible"))
         return(0)
@@ -258,6 +213,7 @@ peelingProcess = function(nucs, startdata, peeler, LB) {
   }
 
   ### If broken loops
+  LB = x$LOOP_BREAKERS
 
   # For each orig, find the indices of its genotypes that also occur in its copy.
   genoMatching = lapply(1:nrow(LB), function(i)
@@ -283,7 +239,7 @@ peelingProcess = function(nucs, startdata, peeler, LB) {
         message("The likelihood algorithm reached a strange place. The maintainer would be grateful to see this example.")
     }
 
-    for (nuc in nucs) {
+    for (nuc in peelOrder) {
       dat1 = peeler(dat1, nuc)
 
       # If impossible data - break out of ES-algorithm and go to next r in loopgrid.
@@ -296,6 +252,37 @@ peelingProcess = function(nucs, startdata, peeler, LB) {
 
   likelihood
 }
+
+
+
+#' @export
+#' @rdname likelihood
+likelihood.list = function(x, markers = NULL, logbase = NULL, ...) {
+  if(!is.pedList(x))
+    stop2("Input is a list, but not a list of `ped` objects")
+
+  # Theta correction not implemented for lists
+  if("theta" %in% names(list(...)))
+    stop2("Theta correction is not implemented for lists")
+
+  if(is.null(markers))
+    markers = seq_len(nMarkers(x))
+  else if (!(is.vector(markers) && !is.list(markers)))
+    stop2("`likelihood.list()` requires `markers` to be a vector of marker names or indices. Received: ", class(markers))
+
+  if(length(markers) == 0)
+    return(numeric(0))
+
+  liks = vapply(x, function(comp)
+    likelihood.ped(comp, markers, logbase = logbase, ...),
+    FUN.VALUE = numeric(length(markers)))
+
+  if(length(markers) == 1)
+    dim(liks) = c(1, length(x))
+
+  if(is.numeric(logbase)) rowSums(liks) else apply(liks,1,prod)
+}
+
 
 
 # Utility for finding which genotypes in dat1 are also in dat2
@@ -320,4 +307,39 @@ matchDat = function(dat1, dat2) {
       nseq[loc1 & loc2]
     }
   }
+}
+
+likelihoodSingleton = function(x, m, theta = 0) {
+  m1 = m[1]
+  m2 = m[2]
+
+  # Quick return if empty
+  if(m1 == 0 || m2 == 0)
+    return(1)
+
+  afr = afreq(m)
+  chromX = isXmarker(m)
+
+  # Theta correction or founder inbreeding
+  if(theta > 0)
+    f = theta
+  else
+    f = founderInbreeding(x, chromType = if(chromX) "x" else "autosomal")
+
+  # Male on X
+  if (chromX && x$SEX == 1) {
+    if (all(m > 0) && m1 != m2)
+      stop2("Heterozygous genotype at X-linked marker in male singleton")
+    return(afr[m1])
+  }
+
+  # One missing allele
+  if (m1 == 0 || m2 == 0) {
+    p = afr[m[m != 0]]
+    res = p^2 + 2 * p * (1 - p)
+    return(res)
+  }
+
+  # Otherwise: The usual HW formula, possibly with inbreeding correction
+  HWprob(m1, m2, afr, f = f)
 }

@@ -1,7 +1,7 @@
 #' Pedigree likelihood computed by MERLIN
 #'
-#' For this functions to work, the program MERLIN (see References below) must be
-#' installed and correctly pointed to in the PATH variable. The `merlin()`
+#' For these functions to work, the program MERLIN (see References below) must
+#' be installed and correctly pointed to in the PATH variable. The `merlin()`
 #' function is a general wrapper which runs MERLIN with the indicated options,
 #' after creating the appropriate input files. For convenience, MERLIN's
 #' "--likelihood" functionality is wrapped in a separate function.
@@ -18,11 +18,19 @@
 #' values from the MERLIN output. Note that the output is the *total* likelihood
 #' including all markers.
 #'
+#' For likelihood computations with linked markers, the argument `rho` should
+#' indicate the recombination fractions between each consecutive pair of markers
+#' (i.e., `rho[i]` is the recombination rate between markers `i-1` and `i`).
+#' These will be converted to centiMorgan distances using Haldane's map
+#' function, and used to create genetic marker map in a MERLIN-friendly format.
+#'
 #' @param x a [`ped`] object.
 #' @param options a single string containing all arguments to merlin except for
 #'   the input file indications.
 #' @param markers a vector of names or indices of markers attached to `x`.
 #'   (Default: all markers).
+#' @param linkageMap a data frame with three columns (chromosome; marker name;
+#'   centiMorgan position) to be used as the marker map by MERLIN.
 #' @param verbose a logical.
 #' @param generateFiles a logical. If TRUE (default), input files to MERLIN
 #'   named '_merlin.ped', '_merlin.dat', '_merlin.map', and '_merlin.freq' are
@@ -33,48 +41,76 @@
 #' @param dir the name of the directory where input files should be written.
 #' @param logfile a character. If this is given, the MERLIN screen output will
 #'   be dumped to a file with this name.
-#'
+#' @param merlinpath the path to the folder containing the merlin executables.
+#'   If the executables are on the system's search path, this can be left as
+#'   NULL (default).
+#' @param rho A vector of length one less than the number of markers, specifying
+#'   the recombination rate between each consecutive pair.
+#' @param logbase Either NULL (default) or a positive number indicating the
+#'   basis for logarithmic output. Typical values are `exp(1)` and 10.
 #' @return `merlin()` returns the screen output of MERLIN invisibly.
 #'
 #'   `likelihoodMerlin()` returns a single number; the total likelihood using
 #'   all indicated markers.
+#'
+#'   `checkMerlin()` returns TRUE if MERLIN is installed and available on the
+#'   system path, and FALSE otherwise.
 #'
 #' @author Magnus Dehli Vigeland
 #' @references <http://csg.sph.umich.edu/abecasis/Merlin/>
 #'
 #' @examples
 #'
-#' \donttest{
-#' ### Requires MERLIN to be installed ###
+#' if(checkMerlin()) {
 #'
+#' ### Trivial example for validation
 #' x = nuclearPed(1)
 #' m1 = marker(x, "1" = 1:2)           # likelihood = 1/2
-#' m2 = marker(x, "1" = 1, "3" = 1:2)    # likelihood = 1/8
-#' x = setMarkers(x, list(m1,m2))
+#' m2 = marker(x, "1" = 1, "3" = 1:2)  # likelihood = 1/8
+#' x = setMarkers(x, list(m1, m2))
 #'
-#' # Likelihood computation by MERLIN:
+#' # MERLIN likelihoods
 #' lik1 = likelihoodMerlin(x, markers = 1, verbose = FALSE)
 #' lik2 = likelihoodMerlin(x, markers = 2, verbose = FALSE)
 #' likTot = likelihoodMerlin(x, verbose = FALSE)
 #' stopifnot(all.equal(
 #'   round(c(lik1, lik2, likTot), c(3,3,4)), c(1/2, 1/8, 1/16)))
 #'
+#' # Example with ped lists
 #' y = list(singleton(1), singleton(2))
-#' y = setMarkers(y, locus = list(alleles=1:2))
+#' y = setMarkers(y, locus = list(alleles = 1:2))
 #' genotype(y[[1]], marker = 1, id = '1') = 1:2
 #' genotype(y[[2]], marker = 1, id = '2') = 1
 #' lik = likelihoodMerlin(y, verbose = FALSE)
 #' stopifnot(all.equal(round(lik, 3), 1/8))
+#'
+#' ### Linked markers
+#' z = nuclearPed(2)
+#' m = marker(z, geno = c("1/1", "1/2", "1/2", "1/2"))
+#' z = setMarkers(z, list(m, m))
+#'
+#' # By MERLIN...
+#' L1 = likelihoodMerlin(z, markers = 1:2, rho = 0.25, verbose = FALSE)
+#'
+#' # ...and by pedprobr
+#' L2 = likelihood2(z, marker1 = 1, marker2 = 2, rho = 0.25)
+#'
+#' # stopifnot(all.equal(signif(L1, 3), signif(L2, 3)))
 #' }
 #'
 #' @export
-merlin = function(x, options, markers = NULL, verbose = TRUE,
+merlin = function(x, options, markers = NULL, linkageMap = NULL, verbose = TRUE,
                   generateFiles = TRUE, cleanup = TRUE, dir = tempdir(),
-                  logfile = NULL) {
+                  logfile = NULL, merlinpath = NULL) {
 
   # Select markers
   if (!hasMarkers(x))
     stop2("Pedigree has no attached markers")
+
+  # Set linkage map if provided
+  if(!is.null(linkageMap))
+    x = setMap(x, map = linkageMap, matchNames = NA)
+
   if(is.null(markers))
     markers = seq_len(nMarkers(x))
   x = selectMarkers(x, markers)
@@ -83,20 +119,22 @@ merlin = function(x, options, markers = NULL, verbose = TRUE,
   xchrom = isXmarker(x)
   if(all(xchrom)) {
     if(verbose) cat("All markers are X-linked; calling MINX\n")
-    program = "minx"
+    program = "minx.exe"
   }
   else if(all(!xchrom)) {
-    program = "merlin"
+    program = "merlin.exe"
   }
   else
     stop2("Both autosomal and X-linked markers are selected\n",
           "Please use the `markers` argument to run these in separate calls")
 
+  if(!is.null(merlinpath))
+    program = file.path(merlinpath, program)
+
   prefix = file.path(dir, "_merlin")
   # Generate input files to MERLIN/MINX
   if (generateFiles) {
-    files = writePed(x, prefix = prefix, merlin = TRUE,
-                     what = c("ped", "dat", "map", "freq"), verbose = verbose)
+    files = writePed(x, prefix = prefix, merlin = TRUE, verbose = verbose)
 
     if(cleanup)
       on.exit({unlink(files); if (verbose) cat("MERLIN input files removed\n")})
@@ -120,27 +158,64 @@ merlin = function(x, options, markers = NULL, verbose = TRUE,
   if (!is.null(logfile))
     write(mout, logfile)
 
-  if (any(substr(mout, 1, 11) == "FATAL ERROR")) {
-    warning(paste0(mout, collapse = "\n"), "\nFATAL ERROR reported by merlin")
-  }
-  else if (verbose) cat("\nMERLIN run completed\n")
+  err = NULL
+  if (any(fatal <- substr(mout, 1, 11) == "FATAL ERROR"))
+    err = mout[which(fatal)[1]:length(mout)]
+  else if (any(warn <- substr(mout, 2, 8) == "WARNING"))
+    err = mout[which(warn)[1] + 0:5]
+
+  if(!is.null(err))
+    warning(paste0(err, collapse = "\n"), call. = FALSE)
+  else if (verbose)
+    cat("\nMERLIN run completed\n")
 
   invisible(mout)
 }
 
-#' @param ... Further arguments passed on to `merlin`
+#' @param ... Further arguments passed on to `merlin()`.
 #'
 #' @rdname merlin
 #' @export
-likelihoodMerlin = function(x, ...) {
+likelihoodMerlin = function(x, markers = NULL, linkageMap = NULL, rho = NULL, logbase = NULL,
+                            options = "--likelihood --bits:100 --megabytes:4000 --quiet",
+                            ...) {
+
+  # Select markers
+  x = selectMarkers(x, markers %||% seq_len(nMarkers(x)))
+
+  # If rho given, replace map
+  if(!is.null(rho)) {
+
+    if(!is.null(linkageMap))
+      stop2("At least one of `rho` and `linkageMap` must be NULL")
+
+    if(length(rho) != nMarkers(x) - 1)
+      stop2("Argument `rho` must have length one less than the number of markers")
+
+    # Avoid infinities
+    rho[rho == 0.5] = haldane(cM = 500)
+
+    # If no chromosome info given, place all markers on chrom 1
+    chr = chrom(x)
+    if(all(is.na(chr)))
+      chr = rep_len(1, nMarkers(x))
+
+    # Convert to centiMorgan positions
+    cm = c(0, haldane(rho = rho))
+
+    linkageMap = data.frame(CHROM = chr, MARKER = name(x), CM = cm)
+  }
 
   # Run MERLIN
-  args = "--likelihood --bits:100 --megabytes:4000 --quiet"
-  mout = merlin(x, args, ...)
+  mout = merlin(x, linkageMap = linkageMap, options = options, ...)
 
-  # Catch possible error
-  if (!is.na(skipped <- which(substr(mout, 3, 9) == "SKIPPED")[1]))
-    stop2(paste(mout[c(skipped - 1, skipped)], collapse = "\n"))
+  # Catch possible errors
+  if (any(skipped <- substr(mout, 3, 9) == "SKIPPED"))
+    stop2(paste(mout[sort(c(which(skipped)-1, which(skipped)))], collapse = "\n"))
+
+  # Bad inheritance? Return lnLik = -Inf (i.e. L = 0)
+  if (any(grepl("Skipping Marker .* [BAD INHERITANCE]", mout)))
+    return(fixMerlinLog(-Inf, logbase = logbase))
 
   # Different chromosomes?
   chromLines = which(substr(mout, 1, 20) == "Analysing Chromosome")
@@ -149,16 +224,18 @@ likelihoodMerlin = function(x, ...) {
   nFam = if(is.pedList(x)) length(x) else 1
   likLines = which(substr(mout, 1, 27) == sprintf("lnLikelihood for %d families", nFam))
 
+  if(length(likLines) == 0)
+    return(fixMerlinLog(-Inf, logbase = logbase))
+
   # If single output value: Return likelihood
   if(length(chromLines) == 0 && length(likLines) == 1) {
     lnlik = as.numeric(strsplit(mout[likLines]," = ")[[1]][2])
-    return(exp(lnlik))
+    return(fixMerlinLog(lnlik, logbase = logbase))
   }
 
   #---------------
   # Otherwise: Return total likelihood
   #---------------
-  message("NB: Several chromosomes - output is total likelihood.")
 
   if(length(chromLines) != length(likLines))
     stop2(mout)
@@ -167,7 +244,15 @@ likelihoodMerlin = function(x, ...) {
   lnliks = as.numeric(unlist(lapply(strsplit(mout[likLines]," = "), '[', 2)))
 
   # Return total
-  total = sum(lnliks)
-  return(round(exp(total), 3))
+  totalLnLik = sum(lnliks)
+
+  fixMerlinLog(totalLnLik, logbase = logbase)
 }
 
+
+
+#' @rdname merlin
+#' @export
+checkMerlin = function() {
+  Sys.which("merlin.exe") != ""
+}

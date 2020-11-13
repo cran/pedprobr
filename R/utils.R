@@ -114,14 +114,11 @@ allGenotypes = function(n) {
   )
 }
 
-# Debug tools: Paste genotypes given as 2*k matrices
-pasteHap = function(hapmat) {
-  if(is.matrix(hapmat)) {
-    stopifnot(nrow(hapmat) == 2)
-    return(paste(hapmat[1, ], hapmat[2, ], sep = "/"))
-  }
-  stopifnot(is.numeric(hapmat))
-  as.character(hapmat)
+# Debug tool, pretty-print "startdata" probs
+pasteGenoProb = function(g) {
+  p = g$prob
+  names(p) = paste(g$pat, g$mat, sep="/")
+  p
 }
 
 
@@ -136,3 +133,31 @@ hasStationaryModel = function(m) {
   isStationary(mut$male, afr) &&
     (isTRUE(sexEq) || isStationary(mut$female, afr))
 }
+
+haldane = function(cM = NULL, rho = NULL) {
+  if(is.null(cM) + is.null(rho) != 1)
+    stop2("Exactly one of `cM` and `rho` must be NULL")
+
+  if(is.null(cM))
+    -50 * log(1 - 2 * rho)
+  else
+    .5 * (1 - exp(-cM/50))
+}
+
+fixMerlinLog = function(a, logbase = NULL) {
+  if(!is.null(logbase)) {
+    if(length(logbase) != 1 || !is.numeric(logbase) || logbase <= 0)
+      stop2("`logbase` must be a positive number: ", logbase)
+
+    if(logbase == exp(1))
+      res = a
+    else
+      res = round(a/log(logbase),3)
+  }
+  else
+    res = signif(exp(a), digits = 3)
+
+  res
+}
+
+
