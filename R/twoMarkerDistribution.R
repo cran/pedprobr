@@ -4,13 +4,13 @@
 #' pedigree member, conditional on known genotypes and the recombination rate
 #' between the markers.
 #'
-#' @param x A `ped` object.
+#' @param x A `ped` object or a list of such.
 #' @param id A single ID label.
 #' @param partialmarker1,partialmarker2 Either a `marker` object, or the name (or
 #'   index) of a marker attached to `x`.
 #' @param rho A single numeric in the interval `[0, 0.5]`: the recombination
 #'   fraction between the two markers.
-#' @param loop_breakers (Only relevant if the pedigree has loops). A vector with
+#' @param loopBreakers (Only relevant if the pedigree has loops). A vector with
 #'   ID labels of individuals to be used as loop breakers. If NULL (default)
 #'   loop breakers are selected automatically. See [breakLoops()].
 #' @param eliminate A non-negative integer, indicating the number of iterations
@@ -20,6 +20,7 @@
 #' @param verbose A logical.
 #'
 #' @return A named matrix giving the joint genotype distribution.
+#'
 #' @author Magnus Dehli Vigeland
 #' @seealso [oneMarkerDistribution()]
 #'
@@ -29,11 +30,11 @@
 #' x = nuclearPed(children = c("bro1", "bro2"))
 #'
 #' # Two SNP markers; first brother homozygous for the `1` allele
-#' SNP1 = SNP2 = marker(x, bro1 = c(1,1), alleles = 1:2)
+#' SNP1 = SNP2 = marker(x, bro1 = "1/1", afreq = c("1" = 0.5, "2" = 0.5))
 #'
 #' plot(x, marker = list(SNP1, SNP2))
 #'
-#' # Genotype distribution for the brother: Depends on rho
+#' # Genotype distribution for the brother depends on linkage
 #' twoMarkerDistribution(x, id = "bro2", SNP1, SNP2, rho = 0)
 #' twoMarkerDistribution(x, id = "bro2", SNP1, SNP2, rho = 0.5)
 #'
@@ -46,12 +47,20 @@
 #' twoMarkerDistribution(x, id = "bro2", SNP1, SNP2, rho = 0.5)
 #'
 #' @export
-twoMarkerDistribution <- function(x, id, partialmarker1, partialmarker2, rho, loop_breakers = NULL,
+twoMarkerDistribution <- function(x, id, partialmarker1, partialmarker2, rho, loopBreakers = NULL,
                                   eliminate = 99, verbose = TRUE) {
 
+  if(is.pedList(x)) {
+    if(is.marker(partialmarker1) || is.marker(partialmarker2))
+      stop2("When `x` has multiple components, the partial markers must be attached")
+
+    pednr = getComponent(x, id, checkUnique = TRUE)
+    x = x[[pednr]]
+  }
 
   if(!is.ped(x))
-    stop2("Input is not a `ped` object")
+    stop2("Input is not a pedigree")
+
   if(!isCount(eliminate, minimum = 0))
     stop2("`eliminate` must be a nonnegative integer")
 
@@ -107,7 +116,7 @@ twoMarkerDistribution <- function(x, id, partialmarker1, partialmarker2, rho, lo
                            genoCombinations(x, m2, id, make.grid = FALSE)))
 
   if (x$UNBROKEN_LOOPS) {
-    x = breakLoops(setMarkers(x, list(m1, m2)), loopBreakers = loop_breakers, verbose = verbose)
+    x = breakLoops(setMarkers(x, list(m1, m2)), loopBreakers = loopBreakers, verbose = verbose)
     m1 = x$MARKERS[[1]]
     m2 = x$MARKERS[[2]]
   }

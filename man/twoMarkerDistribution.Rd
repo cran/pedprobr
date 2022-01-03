@@ -10,13 +10,13 @@ twoMarkerDistribution(
   partialmarker1,
   partialmarker2,
   rho,
-  loop_breakers = NULL,
+  loopBreakers = NULL,
   eliminate = 99,
   verbose = TRUE
 )
 }
 \arguments{
-\item{x}{A \code{ped} object.}
+\item{x}{A \code{ped} object or a list of such.}
 
 \item{id}{A single ID label.}
 
@@ -26,7 +26,7 @@ index) of a marker attached to \code{x}.}
 \item{rho}{A single numeric in the interval \verb{[0, 0.5]}: the recombination
 fraction between the two markers.}
 
-\item{loop_breakers}{(Only relevant if the pedigree has loops). A vector with
+\item{loopBreakers}{(Only relevant if the pedigree has loops). A vector with
 ID labels of individuals to be used as loop breakers. If NULL (default)
 loop breakers are selected automatically. See \code{\link[=breakLoops]{breakLoops()}}.}
 
@@ -51,11 +51,11 @@ between the markers.
 x = nuclearPed(children = c("bro1", "bro2"))
 
 # Two SNP markers; first brother homozygous for the `1` allele
-SNP1 = SNP2 = marker(x, bro1 = c(1,1), alleles = 1:2)
+SNP1 = SNP2 = marker(x, bro1 = "1/1", afreq = c("1" = 0.5, "2" = 0.5))
 
 plot(x, marker = list(SNP1, SNP2))
 
-# Genotype distribution for the brother: Depends on rho
+# Genotype distribution for the brother depends on linkage
 twoMarkerDistribution(x, id = "bro2", SNP1, SNP2, rho = 0)
 twoMarkerDistribution(x, id = "bro2", SNP1, SNP2, rho = 0.5)
 

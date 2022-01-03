@@ -33,12 +33,17 @@
 #' @param marker1,marker2 Single markers compatible with `x`.
 #' @param rho The recombination rate between `marker1` and `marker2`. To make
 #'   biological sense `rho` should be between 0 and 0.5.
+#' @param lump Activate allele lumping, i.e., merging unobserved alleles. This
+#'   is an important time saver, and should be applied in nearly all cases. (The
+#'   parameter exists mainly for debugging purposes.) The lumping algorithm will
+#'   detect (and complain) if any markers use a non-lumpable mutation model.
+#'   Default: TRUE.
 #' @param eliminate Mostly for internal use: a non-negative integer indicating
 #'   the number of iterations in the internal genotype-compatibility algorithm.
 #'   Positive values can save time if the number of alleles is large.
 #' @param logbase Either NULL (default) or a positive number indicating the
 #'   basis for logarithmic output. Typical values are `exp(1)` and 10.
-#' @param loop_breakers A vector of ID labels indicating loop breakers. If NULL
+#' @param loopBreakers A vector of ID labels indicating loop breakers. If NULL
 #'   (default), automatic selection of loop breakers will be performed. See
 #'   [breakLoops()].
 #' @param peelOrder For internal use.
@@ -56,15 +61,31 @@
 #'
 #' @examples
 #'
-#' ### Example 1: Likelihood of trio with inbred father
+#' ### Simple likelihood ###
+#' p = 0.1
+#' q = 1 - p
 #'
+#' # Singleton
+#' s = singleton() |> addMarker(geno = "1/2", afreq = c("1" = p, "2" = q))
+#'
+#' stopifnot(all.equal(likelihood(s), 2*p*q))
+#'
+#' # Trio
+#' t = nuclearPed() |>
+#'   addMarker(geno = c("1/1", "1/2", "1/1"), afreq = c("1" = p, "2" = q))
+#'
+#' stopifnot(all.equal(likelihood(t), p^2 * 2*p*q * 0.5))
+#'
+#'
+#' ### Example of calculation with inbred founders ###
+#'
+#' ### Case 1: Trio with inbred father
 #' x = cousinPed(0, child = TRUE)
 #' x = addSon(x, 5)
 #' x = relabel(x, old = 5:7, new = c("father", "mother", "child"))
 #'
-#' # Equifrequent SNP marker: father homozygous, child heterozygous
-#' m = marker(x, father = 1, child = 1:2)
-#' x = addMarkers(x, m)
+#' # Add equifrequent SNP; father homozygous, child heterozygous
+#' x = addMarker(x, father = "1/1", child = "1/2")
 #'
 #' # Plot with genotypes
 #' plot(x, marker = 1)
@@ -73,9 +94,8 @@
 #' lik1 = likelihood(x, markers = 1)
 #'
 #'
-#' ### Example 2: Same as above, but using founder inbreeding
-#'
-#' # Extract the trio
+#' ### Case 2: Using founder inbreeding
+#' # Remove ancestry of father
 #' y = subset(x, c("father", "mother", "child"))
 #'
 #' # Indicate that the father has inbreeding coefficient 1/4
@@ -96,9 +116,12 @@ likelihood = function(x, ...) UseMethod("likelihood", x)
 
 #' @export
 #' @rdname likelihood
-likelihood.ped = function(x, markers = NULL, peelOrder = NULL,
-                          eliminate = 0, logbase = NULL, loop_breakers = NULL,
+likelihood.ped = function(x, markers = NULL, peelOrder = NULL, lump = TRUE,
+                          eliminate = 0, logbase = NULL, loopBreakers = NULL,
                           verbose = FALSE, theta = 0, ...) {
+
+  if(theta > 0 && hasInbredFounders(x))
+    stop2("Theta correction cannot be used in pedigrees with inbred founders")
 
   if(hasSelfing(x))
     stop2("Likelihood of pedigrees with selfing is not implemented.\n",
@@ -107,6 +130,7 @@ likelihood.ped = function(x, markers = NULL, peelOrder = NULL,
   # Catch erroneous input
   if(is.ped(peelOrder))
     stop2("Invalid input for argument `peelOrder`. Received object type: ", class(peelOrder))
+
 
   if(is.null(markers))
     markers = x$MARKERS
@@ -132,19 +156,22 @@ likelihood.ped = function(x, markers = NULL, peelOrder = NULL,
   }
 
   # Allele lumping
-  markers = lapply(markers, reduceAlleles, verbose = verbose)
+  if(lump)
+    markers = lapply(markers, function(m) reduceAlleles(m, verbose = verbose))
 
   # Break unbroken loops TODO: move up (avoid re-attaching)
   if (x$UNBROKEN_LOOPS) {
     if(verbose)
       message("Tip: To optimize speed, consider breaking loops before calling 'likelihood'. See ?breakLoops.")
-    x = breakLoops(setMarkers(x, markers), loopBreakers = loop_breakers, verbose = verbose)
+    x = breakLoops(setMarkers(x, markers), loopBreakers = loopBreakers, verbose = verbose)
     markers = x$MARKERS
   }
 
   # Peeling order: Same for all markers
   if(is.null(peelOrder))
-    peelOrder = informativeSubnucs(x, mlist = markers, peelOrder = peelingOrder(x))
+    peelOrder = peelingOrder(x)
+  if(theta == 0)
+    peelOrder = informativeSubnucs(x, mlist = markers, peelOrder = peelOrder)
 
   if(verbose)
     message(sprintf("%d informative %s", length(peelOrder), if(length(peelOrder) == 1) "nucleus" else "nuclei"))
@@ -160,7 +187,7 @@ likelihood.ped = function(x, markers = NULL, peelOrder = NULL,
     message("Chromosome type: ", if(Xchrom) "X" else "autosomal")
 
   # Select tools for peeling
-  # TODO: Orgainse better, e.g., skip startdata if theta > 0
+  # TODO: Organise better, e.g., skip startdata if theta > 0
   if(Xchrom) {
     starter = function(x, m) startdata_M_X(x, m, eliminate = eliminate, treatAsFounder = treatAsFou)
     peeler = function(x, m) function(dat, sub) .peel_M_X(dat, sub, SEX = x$SEX, mutmat = mutmod(m))
@@ -189,6 +216,9 @@ likelihood.ped = function(x, markers = NULL, peelOrder = NULL,
 
 # Internal function: likelihood of a single marker
 peelingProcess = function(x, m, startdata, peeler, peelOrder = NULL) {
+
+  if(hasUnbrokenLoops(x))
+    stop2("Peeling process cannot handle unbroken pedigree loops")
 
   if(is.null(peelOrder))
     peelOrder = informativeSubnucs(x, m)

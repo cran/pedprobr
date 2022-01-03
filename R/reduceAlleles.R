@@ -12,8 +12,7 @@
 #'   allele set.
 #'
 #' @examples
-#' x = nuclearPed()
-#' x = setMarkers(x, marker(x, geno = c("1/1", NA, NA), alleles = 1:4))
+#' x = nuclearPed() |> addMarker(geno = c("1/1", NA, NA), alleles = 1:4)
 #'
 #' # Before lumping
 #' afreq(x, 1)
@@ -65,7 +64,8 @@ reduceAlleles = function(marker, verbose = FALSE) {
 
   # No lumping if all, or all but one, are observed
   if (length(presentIdx) >= length(origAlleles) - 1) {
-    if(verbose) message("Lumping not needed - all (or all but one) alleles present")
+    if(verbose) message(sprintf("Lumping not needed: %d of %d alleles observed",
+                                length(presentIdx), length(origAlleles)))
     return(marker)
   }
 

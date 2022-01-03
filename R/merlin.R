@@ -64,10 +64,9 @@
 #' if(checkMerlin()) {
 #'
 #' ### Trivial example for validation
-#' x = nuclearPed(1)
-#' m1 = marker(x, "1" = 1:2)           # likelihood = 1/2
-#' m2 = marker(x, "1" = 1, "3" = 1:2)  # likelihood = 1/8
-#' x = setMarkers(x, list(m1, m2))
+#' x = nuclearPed(1) |>
+#'   addMarker("1" = "1/2") |>            # likelihood = 1/2
+#'   addMarker("1" = "1/1", "3" = "1/2")  # likelihood = 1/8
 #'
 #' # MERLIN likelihoods
 #' lik1 = likelihoodMerlin(x, markers = 1, verbose = FALSE)
@@ -79,8 +78,8 @@
 #' # Example with ped lists
 #' y = list(singleton(1), singleton(2))
 #' y = setMarkers(y, locus = list(alleles = 1:2))
-#' genotype(y[[1]], marker = 1, id = '1') = 1:2
-#' genotype(y[[2]], marker = 1, id = '2') = 1
+#' genotype(y[[1]], marker = 1, id = "1") = "1/2"
+#' genotype(y[[2]], marker = 1, id = "2") = "1/1"
 #' lik = likelihoodMerlin(y, verbose = FALSE)
 #' stopifnot(all.equal(round(lik, 3), 1/8))
 #'
@@ -119,10 +118,10 @@ merlin = function(x, options, markers = NULL, linkageMap = NULL, verbose = TRUE,
   xchrom = isXmarker(x)
   if(all(xchrom)) {
     if(verbose) cat("All markers are X-linked; calling MINX\n")
-    program = "minx.exe"
+    program = "minx"
   }
   else if(all(!xchrom)) {
-    program = "merlin.exe"
+    program = "merlin"
   }
   else
     stop2("Both autosomal and X-linked markers are selected\n",
@@ -131,7 +130,11 @@ merlin = function(x, options, markers = NULL, linkageMap = NULL, verbose = TRUE,
   if(!is.null(merlinpath))
     program = file.path(merlinpath, program)
 
+  if(!nzchar(Sys.which(program)))
+    stop2("MERLIN executible not found. Suggestion: Use the parameter `merlinpath` to point to the MERLIN folder.")
+
   prefix = file.path(dir, "_merlin")
+
   # Generate input files to MERLIN/MINX
   if (generateFiles) {
     files = writePed(x, prefix = prefix, merlin = TRUE, verbose = verbose)
@@ -254,5 +257,5 @@ likelihoodMerlin = function(x, markers = NULL, linkageMap = NULL, rho = NULL, lo
 #' @rdname merlin
 #' @export
 checkMerlin = function() {
-  Sys.which("merlin.exe") != ""
+  nzchar(Sys.which("merlin"))
 }
