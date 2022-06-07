@@ -4,7 +4,7 @@
 \alias{merlin}
 \alias{likelihoodMerlin}
 \alias{checkMerlin}
-\title{Pedigree likelihood computed by MERLIN}
+\title{Pedigree likelihoods computed by MERLIN}
 \usage{
 merlin(
   x,
@@ -16,7 +16,8 @@ merlin(
   cleanup = TRUE,
   dir = tempdir(),
   logfile = NULL,
-  merlinpath = NULL
+  merlinpath = NULL,
+  checkpath = TRUE
 )
 
 likelihoodMerlin(
@@ -25,6 +26,7 @@ likelihoodMerlin(
   linkageMap = NULL,
   rho = NULL,
   logbase = NULL,
+  perChrom = FALSE,
   options = "--likelihood --bits:100 --megabytes:4000 --quiet",
   ...
 )
@@ -32,41 +34,46 @@ likelihoodMerlin(
 checkMerlin(program = NULL, version = TRUE, error = FALSE)
 }
 \arguments{
-\item{x}{a \code{\link{ped}} object.}
+\item{x}{A \code{\link{ped}} object.}
 
-\item{options}{a single string containing all arguments to merlin except for
+\item{options}{A single string containing all arguments to merlin except for
 the input file indications.}
 
-\item{markers}{a vector of names or indices of markers attached to \code{x}.
+\item{markers}{A vector of names or indices of markers attached to \code{x}.
 (Default: all markers).}
 
-\item{linkageMap}{a data frame with three columns (chromosome; marker name;
+\item{linkageMap}{A data frame with three columns (chromosome; marker name;
 centiMorgan position) to be used as the marker map by MERLIN.}
 
-\item{verbose}{a logical.}
+\item{verbose}{A logical.}
 
-\item{generateFiles}{a logical. If TRUE (default), input files to MERLIN
+\item{generateFiles}{A logical. If TRUE (default), input files to MERLIN
 named '_merlin.ped', '_merlin.dat', '_merlin.map', and '_merlin.freq' are
 created in the directory indicated by \code{dir}. If FALSE, no files are
 created.}
 
-\item{cleanup}{a logical. If TRUE (default), the MERLIN input files are
+\item{cleanup}{A logical. If TRUE (default), the MERLIN input files are
 deleted after the call to MERLIN.}
 
-\item{dir}{the name of the directory where input files should be written.}
+\item{dir}{The name of the directory where input files should be written.}
 
-\item{logfile}{a character. If this is given, the MERLIN screen output will
+\item{logfile}{A character. If this is given, the MERLIN screen output will
 be dumped to a file with this name.}
 
-\item{merlinpath}{the path to the folder containing the merlin executables.
+\item{merlinpath}{The path to the folder containing the merlin executables.
 If the executables are on the system's search path, this can be left as
 NULL (default).}
+
+\item{checkpath}{A logical indicating whether to check that the merlin
+executable is found.}
 
 \item{rho}{A vector of length one less than the number of markers, specifying
 the recombination rate between each consecutive pair.}
 
 \item{logbase}{Either NULL (default) or a positive number indicating the
 basis for logarithmic output. Typical values are \code{exp(1)} and 10.}
+
+\item{perChrom}{A logical; if TRUE, likelihoods are reported per chromosome.}
 
 \item{...}{Further arguments passed on to \code{merlin()}.}
 
@@ -90,13 +97,17 @@ all indicated markers.
 an error is raised.
 }
 \description{
-For these functions to work, the program MERLIN (see References below) must
-be installed and correctly pointed to in the PATH variable. The \code{merlin()}
-function is a general wrapper which runs MERLIN with the indicated options,
-after creating the appropriate input files. For convenience, MERLIN's
-"--likelihood" functionality is wrapped in a separate function.
+These functions enable users to call MERLIN (Abecasis et al., 2002) from
+within R.
 }
 \details{
+For these functions to work, the program MERLIN must be installed (see link
+in the Reference section below) and correctly pointed to in the PATH
+variable. The \code{merlin()} function is a general wrapper which runs MERLIN with
+the indicated options, after creating the appropriate input files. For
+convenience, MERLIN's "--likelihood" functionality is wrapped in a separate
+function.
+
 The \code{merlin()} function creates input files "_merlin.ped", "_merlin.dat",
 "_merlin.map" and "_merlin.freq" in the \code{dir} directory, and then runs the
 following command through a call to \code{\link[=system]{system()}}:
@@ -154,7 +165,8 @@ L2 = likelihood2(z, marker1 = 1, marker2 = 2, rho = 0.25)
 
 }
 \references{
-\url{https://csg.sph.umich.edu/abecasis/merlin/}
+Abecasis et al. (2002) Nat Gen 30:97-101.
+\url{https://csg.sph.umich.edu/abecasis/merlin/}.
 }
 \author{
 Magnus Dehli Vigeland

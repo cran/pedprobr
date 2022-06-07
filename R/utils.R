@@ -154,9 +154,17 @@ fixMerlinLog = function(a, logbase = NULL) {
     else
       res = round(a/log(logbase),3)
   }
-  else
+  else {
     res = signif(exp(a), digits = 3)
-
+    uflow = res == 0 & a > -Inf
+    if(any(uflow))
+      warning("Underflow!\nSome lnLikelihoods reported by MERLIN are too small to be exp'ed.",
+              immediate. = TRUE, call. = FALSE)
+    oflow = res == Inf & a < Inf
+    if(any(oflow))
+      warning("Overflow!\nSome lnLikelihoods reported by MERLIN are too large to be exp'ed.",
+              immediate. = TRUE, call. = FALSE)
+  }
   res
 }
 

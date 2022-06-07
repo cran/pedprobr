@@ -1,10 +1,14 @@
-#' Pedigree likelihood computed by MERLIN
+#' Pedigree likelihoods computed by MERLIN
 #'
-#' For these functions to work, the program MERLIN (see References below) must
-#' be installed and correctly pointed to in the PATH variable. The `merlin()`
-#' function is a general wrapper which runs MERLIN with the indicated options,
-#' after creating the appropriate input files. For convenience, MERLIN's
-#' "--likelihood" functionality is wrapped in a separate function.
+#' These functions enable users to call MERLIN (Abecasis et al., 2002) from
+#' within R.
+#'
+#' For these functions to work, the program MERLIN must be installed (see link
+#' in the Reference section below) and correctly pointed to in the PATH
+#' variable. The `merlin()` function is a general wrapper which runs MERLIN with
+#' the indicated options, after creating the appropriate input files. For
+#' convenience, MERLIN's "--likelihood" functionality is wrapped in a separate
+#' function.
 #'
 #' The `merlin()` function creates input files "_merlin.ped", "_merlin.dat",
 #' "_merlin.map" and "_merlin.freq" in the `dir` directory, and then runs the
@@ -24,26 +28,28 @@
 #' These will be converted to centiMorgan distances using Haldane's map
 #' function, and used to create genetic marker map in a MERLIN-friendly format.
 #'
-#' @param x a [`ped`] object.
-#' @param options a single string containing all arguments to merlin except for
+#' @param x A [`ped`] object.
+#' @param options A single string containing all arguments to merlin except for
 #'   the input file indications.
-#' @param markers a vector of names or indices of markers attached to `x`.
+#' @param markers A vector of names or indices of markers attached to `x`.
 #'   (Default: all markers).
-#' @param linkageMap a data frame with three columns (chromosome; marker name;
+#' @param linkageMap A data frame with three columns (chromosome; marker name;
 #'   centiMorgan position) to be used as the marker map by MERLIN.
-#' @param verbose a logical.
-#' @param generateFiles a logical. If TRUE (default), input files to MERLIN
+#' @param verbose A logical.
+#' @param generateFiles A logical. If TRUE (default), input files to MERLIN
 #'   named '_merlin.ped', '_merlin.dat', '_merlin.map', and '_merlin.freq' are
 #'   created in the directory indicated by `dir`. If FALSE, no files are
 #'   created.
-#' @param cleanup a logical. If TRUE (default), the MERLIN input files are
+#' @param cleanup A logical. If TRUE (default), the MERLIN input files are
 #'   deleted after the call to MERLIN.
-#' @param dir the name of the directory where input files should be written.
-#' @param logfile a character. If this is given, the MERLIN screen output will
+#' @param dir The name of the directory where input files should be written.
+#' @param logfile A character. If this is given, the MERLIN screen output will
 #'   be dumped to a file with this name.
-#' @param merlinpath the path to the folder containing the merlin executables.
+#' @param merlinpath The path to the folder containing the merlin executables.
 #'   If the executables are on the system's search path, this can be left as
 #'   NULL (default).
+#' @param checkpath A logical indicating whether to check that the merlin
+#'   executable is found.
 #' @param rho A vector of length one less than the number of markers, specifying
 #'   the recombination rate between each consecutive pair.
 #' @param logbase Either NULL (default) or a positive number indicating the
@@ -65,7 +71,8 @@
 #'   an error is raised.
 #'
 #' @author Magnus Dehli Vigeland
-#' @references <https://csg.sph.umich.edu/abecasis/merlin/>
+#' @references Abecasis et al. (2002) Nat Gen 30:97-101.
+#'   <https://csg.sph.umich.edu/abecasis/merlin/>.
 #'
 #' @examples
 #'
@@ -108,7 +115,7 @@
 #' @export
 merlin = function(x, options, markers = NULL, linkageMap = NULL, verbose = TRUE,
                   generateFiles = TRUE, cleanup = TRUE, dir = tempdir(),
-                  logfile = NULL, merlinpath = NULL) {
+                  logfile = NULL, merlinpath = NULL, checkpath = TRUE) {
 
   # Select markers
   if (!hasMarkers(x))
@@ -138,7 +145,8 @@ merlin = function(x, options, markers = NULL, linkageMap = NULL, verbose = TRUE,
   if(!is.null(merlinpath))
     program = file.path(merlinpath, program)
 
-  checkMerlin(program, version = FALSE, error = TRUE)
+  if(checkpath)
+    checkMerlin(program, version = FALSE, error = TRUE)
 
   prefix = file.path(dir, "_merlin")
 
@@ -182,11 +190,12 @@ merlin = function(x, options, markers = NULL, linkageMap = NULL, verbose = TRUE,
   invisible(mout)
 }
 
+#' @param perChrom A logical; if TRUE, likelihoods are reported per chromosome.
 #' @param ... Further arguments passed on to `merlin()`.
 #'
 #' @rdname merlin
 #' @export
-likelihoodMerlin = function(x, markers = NULL, linkageMap = NULL, rho = NULL, logbase = NULL,
+likelihoodMerlin = function(x, markers = NULL, linkageMap = NULL, rho = NULL, logbase = NULL, perChrom = FALSE,
                             options = "--likelihood --bits:100 --megabytes:4000 --quiet",
                             ...) {
 
@@ -253,10 +262,14 @@ likelihoodMerlin = function(x, markers = NULL, linkageMap = NULL, rho = NULL, lo
   # Extract log-likelihoods
   lnliks = as.numeric(unlist(lapply(strsplit(mout[likLines]," = "), '[', 2)))
 
-  # Return total
-  totalLnLik = sum(lnliks)
+  if(perChrom) {
+    res = lnliks
+    names(res) = trimws(sub("Analysing Chromosome", "", mout[chromLines]))
+  }
+  else
+    res = sum(lnliks)
 
-  fixMerlinLog(totalLnLik, logbase = logbase)
+  fixMerlinLog(res, logbase = logbase)
 }
 
 
