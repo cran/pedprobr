@@ -211,7 +211,7 @@ likelihood.ped = function(x, markers = NULL, peelOrder = NULL, lump = TRUE,
       peelingProcess(x, m, starter(x,m), peeler(x,m), peelOrder)
   })
 
-  res = unlist(resList)
+  res = unlist(resList, recursive = FALSE)
 
   if(is.numeric(logbase)) log(res, logbase) else res
 }
@@ -248,9 +248,10 @@ peelingProcess = function(x, m, startdata, peeler, peelOrder = NULL) {
 
   ### If broken loops
   LB = x$LOOP_BREAKERS
+  nr = nrow(LB)
 
   # For each orig, find the indices of its genotypes that also occur in its copy.
-  genoMatching = lapply(1:nrow(LB), function(i)
+  genoMatching = lapply(seq_len(nr), function(i)
     matchDat(dat[[LB[[i,"orig"]]]], dat[[LB[[i,"copy"]]]]))
 
   # Then take cross product of these vectors.
@@ -263,7 +264,7 @@ peelingProcess = function(x, m, startdata, peeler, peelOrder = NULL) {
     dat1 = dat
     attr(dat1, "impossible") = FALSE
 
-    for (i in 1:nrow(LB)) { # Note: r[i] is a valid index of orig[i]$pat/mat
+    for (i in seq_len(nr)) { # Note: r[i] is a valid index of orig[i]$pat/mat
       origi = LB[[i, "orig"]]
       copyi = LB[[i, "copy"]]
       origDat = dat[[origi]]
