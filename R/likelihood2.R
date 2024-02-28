@@ -4,7 +4,7 @@ likelihood2 = function(x, ...) UseMethod("likelihood2", x)
 
 #' @export
 #' @rdname likelihood
-likelihood2.ped = function(x, marker1, marker2, rho, peelOrder = NULL,
+likelihood2.ped = function(x, marker1, marker2, rho = NULL, peelOrder = NULL,
                           eliminate = 0, logbase = NULL, loopBreakers = NULL,
                           verbose = FALSE, ...) {
 
@@ -26,15 +26,7 @@ likelihood2.ped = function(x, marker1, marker2, rho, peelOrder = NULL,
   else if(!is.marker(marker2))
     stop2("Argument `marker2` must be a single marker. Received: ", class(marker2))
 
-  # Check rho
-  if(missing(rho) || is.null(rho))
-    stop2("Argument `rho` is missing")
-  if(!is.numeric(rho) || length(rho) != 1) {
-    if(is.ped(rho) || is.marker(rho))
-      stop2("Wrong input syntax. Argument `rho` should be a single number, but received: ", class(rho))
-    else
-      stop2("Argument `rho` must be a single number: ", rho)
-  }
+  checkRho(rho)
 
   ### Quick return if singleton (linkage is then irrelevant)
   if(is.singleton(x)) {
@@ -90,15 +82,13 @@ likelihood2.ped = function(x, marker1, marker2, rho, peelOrder = NULL,
 
   # Peeler function
   if(!Xchrom)
-    peeler = function(dat, sub) .peel_MM_AUT(dat, sub, rho, mut1 = attr(marker1, "mutmod"), mut2 = attr(marker2, "mutmod"))
+    peeler = function(dat, sub) .peel_MM_AUT(dat, sub, rho, mut1 = mutmod(marker1), mut2 = mutmod(marker2))
   else
-    peeler = function(dat, sub) .peel_MM_X(dat, sub, rho, x$SEX, mut1 = attr(marker1, "mutmod"), mut2 = attr(marker2, "mutmod"))
+    peeler = function(dat, sub) .peel_MM_X(dat, sub, rho, x$SEX, mut1 = mutmod(marker1), mut2 = mutmod(marker2))
 
   # Startdata
-  if(Xchrom)
-    startdata = startdata_MM_X(x, marker1, marker2, eliminate, treatAsFou)
-  else
-    startdata = startdata_MM_AUT(x, marker1, marker2, eliminate, treatAsFou)
+  pedInfo = .pedInfo(x, treatAsFounder = treatAsFou, Xchrom = Xchrom)
+  startdata = startdata_MM(x, marker1, marker2, pedInfo = pedInfo)
 
   res = peelingProcess(x, m = NULL, startdata = startdata, peeler = peeler, peelOrder = peelOrder)
 

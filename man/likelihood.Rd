@@ -32,7 +32,7 @@ likelihood2(x, ...)
   x,
   marker1,
   marker2,
-  rho,
+  rho = NULL,
   peelOrder = NULL,
   eliminate = 0,
   logbase = NULL,
@@ -65,9 +65,7 @@ parameter exists mainly for debugging purposes.) The lumping algorithm will
 detect (and complain) if any markers use a non-lumpable mutation model.
 Default: TRUE.}
 
-\item{eliminate}{Mostly for internal use: a non-negative integer indicating
-the number of iterations in the internal genotype-compatibility algorithm.
-Positive values can save time if the number of alleles is large.}
+\item{eliminate}{Deprecated, not used.}
 
 \item{logbase}{Either NULL (default) or a positive number indicating the
 basis for logarithmic output. Typical values are \code{exp(1)} and 10.}
@@ -115,17 +113,18 @@ For more than two linked markers, see \code{\link[=likelihoodMerlin]{likelihoodM
 ### Simple likelihood ###
 p = 0.1
 q = 1 - p
+afr = c("1" = p, "2" = q)
 
 # Singleton
-s = singleton() |> addMarker(geno = "1/2", afreq = c("1" = p, "2" = q))
+s = singleton() |> addMarker(geno = "1/2", afreq = afr)
 
 stopifnot(all.equal(likelihood(s), 2*p*q))
 
 # Trio
-t = nuclearPed() |>
-  addMarker(geno = c("1/1", "1/2", "1/1"), afreq = c("1" = p, "2" = q))
+trio = nuclearPed() |>
+  addMarker(geno = c("1/1", "1/2", "1/1"), afreq = afr)
 
-stopifnot(all.equal(likelihood(t), p^2 * 2*p*q * 0.5))
+stopifnot(all.equal(likelihood(trio), p^2 * 2*p*q * 0.5))
 
 
 ### Example of calculation with inbred founders ###

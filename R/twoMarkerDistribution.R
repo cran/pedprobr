@@ -13,10 +13,7 @@
 #' @param loopBreakers (Only relevant if the pedigree has loops). A vector with
 #'   ID labels of individuals to be used as loop breakers. If NULL (default)
 #'   loop breakers are selected automatically. See [breakLoops()].
-#' @param eliminate A non-negative integer, indicating the number of iterations
-#'   in the internal algorithm for reducing the genotype space. Positive values
-#'   can save time if `partialmarker1` and/or `partialmarker2` have many
-#'   alleles.
+#' @param eliminate Deprecated, not used.
 #' @param verbose A logical.
 #'
 #' @return A named matrix giving the joint genotype distribution.
@@ -47,8 +44,11 @@
 #' twoMarkerDistribution(x, id = "bro2", SNP1, SNP2, rho = 0.5)
 #'
 #' @export
-twoMarkerDistribution <- function(x, id, partialmarker1, partialmarker2, rho, loopBreakers = NULL,
-                                  eliminate = 99, verbose = TRUE) {
+twoMarkerDistribution <- function(x, id, partialmarker1, partialmarker2, rho = NULL,
+                                  loopBreakers = NULL, eliminate = 0, verbose = TRUE) {
+
+  if(length(id) != 1)
+    stop2("Argument `id` must have length 1: ", id)
 
   if(is.pedList(x)) {
     if(is.marker(partialmarker1) || is.marker(partialmarker2))
@@ -61,27 +61,26 @@ twoMarkerDistribution <- function(x, id, partialmarker1, partialmarker2, rho, lo
   if(!is.ped(x))
     stop2("Input is not a pedigree")
 
-  if(!isCount(eliminate, minimum = 0))
-    stop2("`eliminate` must be a nonnegative integer")
-
   m1 = partialmarker1
   if (!is.marker(m1)) {
     if(length(m1) != 1)
-      stop2("`partialmarker1` must have length 1")
+      stop2("Argument `partialmarker1` must have length 1: ", partialmarker1)
     m1 = getMarkers(x, markers = m1)[[1]]
   }
 
   m2 = partialmarker2
   if (!is.marker(m2)) {
     if(length(m2) != 1)
-      stop2("`partialmarker2` must have length 1")
+      stop2("Argument `partialmarker2` must have length 1: ", partialmarker2)
     m2 = getMarkers(x, markers = m2)[[1]]
   }
   if (!is.null(x$LOOP_BREAKERS))
-    stop2("`ped` objects with pre-broken loops are not allowed as input to `twoMarkerDistribution`")
+    stop2("Pedigrees with pre-broken loops are not allowed in this function")
 
   if (!identical(chrom(m1), chrom(m2)))
     stop2("Partial markers are on different chromosomes: ", toString(c(chrom(m1), chrom(m2))))
+
+  checkRho(rho)
 
   onX = isXmarker(m1)
   XandMale = onX && getSex(x, id) == 1
@@ -151,7 +150,7 @@ twoMarkerDistribution <- function(x, id, partialmarker1, partialmarker2, rho, lo
     probs.subset[, 2] = match(probs.subset[, 2], homoz2)
   }
 
-  marginal = likelihood2(x, marker1 = m1, marker2 = m2, rho = rho, eliminate = eliminate)
+  marginal = likelihood2(x, marker1 = m1, marker2 = m2, rho = rho)
   if (marginal == 0)
     stop2("Partial marker data is impossible")
 
@@ -163,7 +162,7 @@ twoMarkerDistribution <- function(x, id, partialmarker1, partialmarker2, rho, lo
   probs[probs.subset] = apply(grid.subset, 1, function(allg_rows) {
     m1[int.id, ] = allgenos1[allg_rows[1], ]
     m2[int.id, ] = allgenos2[allg_rows[2], ]
-    likelihood2(x, marker1 = m1, marker2 = m2, rho = rho, eliminate = eliminate)
+    likelihood2(x, marker1 = m1, marker2 = m2, rho = rho)
   })
 
   # Timing
