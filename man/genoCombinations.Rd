@@ -4,7 +4,7 @@
 \alias{genoCombinations}
 \title{Genotype combinations}
 \usage{
-genoCombinations(x, partialmarker, ids, make.grid = TRUE)
+genoCombinations(x, partialmarker = x$MARKERS[[1]], ids, make.grid = TRUE)
 }
 \arguments{
 \item{x}{a \code{\link[=ped]{ped()}} object.}
@@ -22,7 +22,7 @@ integer vectors, one vector for each element of \code{ids}. Each integer
 represents a genotype, in the form of a row number of the matrix
 \code{allGenotypes(n)}, where \code{n} is the number of alleles of the marker.
 
-If \code{make.grid = TRUE}, the cartesian product of the vectors is taken,
+If \code{make.grid = TRUE}, the Cartesian product of the vectors is taken,
 resulting in a matrix with one column for each element of \code{ids}.
 }
 \description{

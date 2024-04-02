@@ -4,7 +4,7 @@
 #' members, possibly conditional on known genotypes for the marker.
 #'
 #' @param x A `ped` object or a list of such.
-#' @param ids A numeric with ID labels of one or more pedigree members.
+#' @param ids A vector of ID labels of one or more members of `x`.
 #' @param partialmarker Either a `marker` object or the name (or index) of a
 #'   marker attached to `x`. If `x` has multiple components, only the latter is
 #'   allowed.
@@ -59,6 +59,8 @@
 oneMarkerDistribution = function(x, ids, partialmarker, loopBreakers = NULL,
                                  eliminate = 0, grid.subset = NULL, verbose = TRUE) {
 
+  ids = as.character(ids)
+
   if(is.pedList(x)) {
     if(is.marker(partialmarker))
       stop2("When `x` has multiple components, `partialmarker` cannot be an unattached marker object")
@@ -81,20 +83,26 @@ oneMarkerDistribution = function(x, ids, partialmarker, loopBreakers = NULL,
     m = getMarkers(x, markers = m)[[1]]
   }
 
+  # Reorder if needed
+   if(!hasParentsBeforeChildren(x)) {
+    x = parentsBeforeChildren(setMarkers(x, m))
+    m = x$MARKERS[[1]]
+   }
+
   if (!is.null(x$LOOP_BREAKERS))
     stop2("`ped` objects with pre-broken loops are not allowed as input to `oneMarkerDistribution()`")
 
   alleles = alleles(m)
-  onX = isXmarker(m)
+  Xchrom = isXmarker(m)
 
   if (verbose) {
     cat("Known genotypes:\n")
     print(m)
-    cat("\nChromosome type    :", ifelse(onX, "X-linked", "autosomal"))
+    cat("\nChromosome type    :", ifelse(Xchrom, "X-linked", "autosomal"))
     cat("\nTarget individuals :", toString(ids), "\n")
   }
 
-  starttime = Sys.time()
+  st = Sys.time()
 
   # Compute grid before loop breaking (works better with eliminate2)
   if (is.null(grid.subset))
@@ -112,7 +120,7 @@ oneMarkerDistribution = function(x, ids, partialmarker, loopBreakers = NULL,
 
   # Character with genotype labels
   gt.strings = paste(alleles[allgenos[, 1]], alleles[allgenos[, 2]], sep = "/")
-  if(onX) {
+  if(Xchrom) {
     sx = getSex(x, ids)
     geno.names =  list(alleles, gt.strings)[sx]
   }
@@ -126,8 +134,8 @@ oneMarkerDistribution = function(x, ids, partialmarker, loopBreakers = NULL,
   # Subset of `probs` that is affected by grid.subset
   probs.subset = grid.subset
 
-  # Needs adjustment for X (in male colums)
-  if(onX) {
+  # Needs adjustment for X (in male columns)
+  if(Xchrom) {
     homoz = which(allgenos[,1] == allgenos[,2])
     probs.subset[, sx == 1] = match(probs.subset[, sx == 1], homoz)
   }
@@ -150,12 +158,11 @@ oneMarkerDistribution = function(x, ids, partialmarker, loopBreakers = NULL,
     m[int.ids, ] = allgenos[r, ]; m})
 
   # Calculate likelihoods and insert in result array
-  probs[probs.subset] = likelihood(x, mlist)
+  probs[probs.subset] = likelihood(x, mlist, allX = Xchrom)
 
   # Timing
-  totalTime = format(Sys.time() - starttime, digits = 3)
   if(verbose)
-    cat("\nAnalysis finished in", totalTime, "\n")
+    cat("\nAnalysis finished in", format(Sys.time() - st, digits = 3), "\n")
 
   probs/marginal
 }
