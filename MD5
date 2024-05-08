@@ -1,6 +1,6 @@
-c2439b97e0724b0c6539d6371c38d29e *DESCRIPTION
+5202bf12df5e01b07d4cb9ea37ba27ed *DESCRIPTION
 2d38519b0ff115cc596ff3f0b9fd2b04 *NAMESPACE
-3a6f2a464f7753e6dd5d1097b0c181a6 *NEWS.md
+999d74d7af98a968c8ccedc5904527cc *NEWS.md
 f22b3ea32c2f67556d0286fb8d57342e *R/buildGenolist.R
 2b9155d26d4f7903e02768371ae04930 *R/genoCombinations.R
 319d0a9540dc6ef100a9b6fa92b321ad *R/haldane.R
@@ -10,7 +10,7 @@ fc2532bd317defd5596959a7403e23bc *R/likelihood2.R
 9eb4a82b3c2139cb9ff9b698373e6034 *R/merlin.R
 cacc125d3a9c85135f9238395933252d *R/oneMarkerDistribution.R
 24054853b84c1ab1877e3251912c6605 *R/pedprobr-package.R
-c39d04d01169cd0b4c7758f7e9dc97f5 *R/peel.R
+b55431752b8df776c668be4aebaae68e *R/peel.R
 65ed4bc836051e2269c94683b8adbc9c *R/reduceAlleles.R
 7638ec7e60c599275908e8f946615edd *R/setMutationModel.R
 7ed6a013d779b4f82fa46796000c4dde *R/startdata.R
@@ -18,7 +18,7 @@ c39d04d01169cd0b4c7758f7e9dc97f5 *R/peel.R
 8a419008839e28449b69b97ade0986ac *R/twoMarkerDistribution.R
 a461930b35ae429c83777c9e7a213dcb *R/utils.R
 82a1bbfe5453e8d403b13e9f4825f06b *README.md
-24bc7c3f5a645905c53152bd3d0b8f61 *build/partial.rdb
+181b5ac5a69bd3e3e542680739e88fd5 *build/partial.rdb
 83ed975d2f0b5d635811ac9633c12175 *inst/CITATION
 eb5d422f3ed0c4da767fca845e262425 *man/HWprob.Rd
 cd9719aff64304145a2c2e7dc47f5f1d *man/allGenotypes.Rd
@@ -38,7 +38,7 @@ f656fec05df00bcb83a02bc6c3960d64 *tests/testthat/test-X-linked-likelihood.R
 7405efe249412cc96315649c5b0d9203 *tests/testthat/test-inbred-founders.R
 a2407decfe2afe0025f72ddbf4259b8d *tests/testthat/test-likelihood-linked.R
 68c9061357d46ed20805fb809ab1b547 *tests/testthat/test-likelihood-list.R
-c93991d74d00918299e86608e5fb76ab *tests/testthat/test-likelihood.R
+863ff2c87aae0d878e658355d72d5ae3 *tests/testthat/test-likelihood.R
 1e9ce9b51a1e26197ea563d020a99328 *tests/testthat/test-merlin.R
 79460df814a69b95d9ac4f5f724dfc6d *tests/testthat/test-mutations.R
 09abebc436af646deda1c2a1ef21cad2 *tests/testthat/test-oneMarkerDist.R
