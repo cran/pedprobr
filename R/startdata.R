@@ -41,20 +41,28 @@ startdata_M = function(x, marker, pedInfo = NULL) {#print("new startdata")
     a = marker[i, 1]
     b = marker[i, 2]
 
-    Xmale = Xchrom && SEX[i] == 1 # Hemizygous male
+    Xmale = Xchrom && SEX[i] == 1
+
     if(Xmale) {
+      # Hemizygous male
       mat = if(b == 0) nseq else b
-      if(isFounder[i])
-        g = list(mat = mat, prob = afr[mat]) |> .reduce()
+      g = if(isFounder[i])
+        list(mat = mat, prob = afr[mat]) |> .reduce()
       else
-        g = list(mat = mat, prob = rep(1, length(mat)))
+        list(mat = mat, prob = rep(1, length(mat)))
     }
-    else if(simpleFou[i]) # Simple founder: alleles directly (skip genotypes)
+    else if(simpleFou[i]) {
+      # Simple founder: alleles directly (skip genotypes)
       g = .alleleDistrib(a, b, afr, f = fi[i])
-    else if(isFounder[i]) # General founder: unphased genotypes with HW probs
+    }
+    else if(isFounder[i]) {
+      # General founder: unphased genotypes with HW probs
       g = .genoDistribFounder(a, b, afr, f = fi[i], COMPLETE = allUnphased)
-    else # Nonfounder: Phased genos with 1's as prob
+    }
+    else {
+      # Nonfounder: phased genos with prob = 1
       g = .genoDistribNonfounder(a, b, COMPLETE = allPhased)
+    }
 
     # Eliminate genotypes based on parents/children
     if(eliminate) {   #.bef = length(g$prob)
@@ -274,8 +282,8 @@ startdata_MM = function(x, marker1, marker2, pedInfo = NULL) {
   }
   else if (a == 0) { # partial founder genotype: -/b
     allele = nseq
-    prob = afr/2
-    prob[b] = prob[b] + 0.5
+    prob  = afr*afr[b]
+    prob[b] = afr[b]
     if(f > 0) {
       prob = prob * (1-f)
       prob[b] = prob[b] + f

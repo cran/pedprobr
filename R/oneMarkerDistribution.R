@@ -5,13 +5,13 @@
 #'
 #' @param x A `ped` object or a list of such.
 #' @param ids A vector of ID labels of one or more members of `x`.
-#' @param partialmarker Either a `marker` object or the name (or index) of a
-#'   marker attached to `x`. If `x` has multiple components, only the latter is
+#' @param marker Either a `marker` object or the name (or index) of a marker
+#'   attached to `x`. If `x` has multiple components, only the latter is
 #'   allowed.
+#' @param partialmarker (Deprecated) An alias for `marker`.
 #' @param loopBreakers (Only relevant if the pedigree has loops). A vector with
 #'   ID labels of individuals to be used as loop breakers. If NULL (default)
-#'   loop breakers are selected automatically. See [breakLoops()].
-#' @param eliminate Deprecated, not used.
+#'   loop breakers are selected automatically. See [pedtools::breakLoops()].
 #' @param grid.subset (Optional; not relevant for most users.) A numeric matrix
 #'   describing a subset of all marker genotype combinations for the `ids`
 #'   individuals. The matrix should have one column for each of the `ids`
@@ -19,68 +19,119 @@
 #'   in terms of the matrix `M = allGenotypes(n)`, where `n` is the number of
 #'   alleles for the marker. If the entry in column `j` is the integer `k`, this
 #'   means that the genotype of individual `ids[j]` is row `k` of `M`.
+#' @param output A character string, either `"array"` (default), "table" or
+#'   "sparse". See Value.
 #' @param verbose A logical.
 #'
-#' @return A named `k`-dimensional array, where `k = length(ids)`, with the
-#'   joint genotype distribution for the `ids` individuals. The probabilities
-#'   are conditional on the known genotypes and the allele frequencies of
-#'   `partialmarker`.
-#' @author Magnus Dehli Vigeland
+#' @return The output format depends on the `output` argument:
+#'
+#' * "array": A named `k`-dimensional array, where `k = length(ids)`, with the
+#'   joint genotype distribution for the `ids` individuals, conditional on the
+#'   known genotypes if present.
+#' * "table": A data frame with `k+1` columns, where each row corresponds
+#'   to a genotype combination, and the last column `prob` gives the
+#'   probability.
+#' * "sparse": A data frame with the same structure as the "table" output,
+#'   but only combinations with non-zero probability are included.
+#'
 #' @seealso [twoMarkerDistribution()]
 #'
 #' @examples
 #'
-#' # Trivial example giving Hardy-Weinberg probabilities
-#' s = singleton(id = 1)
-#' m = marker(s, alleles = 1:2) # equifrequent SNP
-#' oneMarkerDistribution(s, ids = 1, partialmarker = m)
+#' # Trivial example: Hardy-Weinberg probabilities for an equifrequent SNP
+#' s = singleton(id = 1) |> addMarker(alleles = 1:2, afreq = c(0.5, 0.5))
+#' oneMarkerDistribution(s, ids = 1)
 #'
 #' # Conditioning on a partial genotype
-#' genotype(m, id = 1) = "1/-"
-#' oneMarkerDistribution(s, ids = 1, partialmarker = m)
+#' s = setGenotype(s, ids = 1, geno = "1/-")
+#' oneMarkerDistribution(s, ids = 1)
 #'
 #' # Genotype distribution for a child of heterozygous parents
-#' trio = nuclearPed(father = "fa", mother = "mo", child = "ch")
-#' m1 = marker(trio, fa = "1/2", mo = "1/2")
-#' oneMarkerDistribution(trio, ids = "ch", partialmarker = m1)
+#' trio = nuclearPed(father = "fa", mother = "mo", child = "ch") |>
+#'   addMarker(fa = "1/2", mo = "1/2")
+#' oneMarkerDistribution(trio, ids = "ch")
 #'
 #' # Joint distribution of the parents, given that the child is heterozygous
-#' m2 = marker(trio, ch = "1/2", afreq = c("1" = 0.5, "2" = 0.5))
-#' oneMarkerDistribution(trio, ids = c("fa", "mo"), partialmarker = m2)
+#' trio = addMarker(trio, ch = "1/2")
+#' ids = c("fa", "mo")
+#' oneMarkerDistribution(trio, ids = ids, marker = 2)
+#'
+#' # Table output of the previous example
+#' oneMarkerDistribution(trio, ids = ids, marker = 2, output = "table")
+#' oneMarkerDistribution(trio, ids = ids, marker = 2, output = "sparse")
 #'
 #' # A different example: The genotype distribution of an individual (id = 8)
 #' # whose half cousin (id = 9) is homozygous for a rare allele.
 #' y = halfCousinPed(degree = 1) |>
 #'   addMarker("9" = "a/a", afreq = c(a = 0.01, b = 0.99))
 #'
-#' oneMarkerDistribution(y, ids = 8, partialmarker = 1)
+#' oneMarkerDistribution(y, ids = 8)
+#'
+#' # Multi-component (trivial) example
+#' z = singletons(1:2) |> addMarker(`1` = "1/2", `2` = "1/2", alleles = 1:2)
+#' oneMarkerDistribution(z, 1:2)
+#' oneMarkerDistribution(z, 1:2, output = "sparse")
 #'
 #' @export
-oneMarkerDistribution = function(x, ids, partialmarker, loopBreakers = NULL,
-                                 eliminate = 0, grid.subset = NULL, verbose = TRUE) {
+oneMarkerDistribution = function(x, ids, marker = 1, loopBreakers = NULL,
+                                 grid.subset = NULL, partialmarker = NULL,
+                                 output = c("array", "table", "sparse"),
+                                 verbose = TRUE) {
+
+  if(!is.null(partialmarker)) {
+    cat("The argument `partialmarker` has been renamed to `marker` and will be removed in a future version.\n")
+    marker = partialmarker
+  }
 
   ids = as.character(ids)
 
-  if(is.pedList(x)) {
-    if(is.marker(partialmarker))
-      stop2("When `x` has multiple components, `partialmarker` cannot be an unattached marker object")
+  output = match.arg(output)
+  formatResult = function(res) {
+    switch(output, array = res,
+           table = omd2df(res, ids, sparse = FALSE),
+           sparse = omd2df(res, ids, sparse = TRUE))
+  }
 
-    pednr = getComponent(x, ids, checkUnique = TRUE)
+  if(is.pedList(x)) {
+    if(is.marker(marker))
+      stop2("When `x` has multiple components, `marker` cannot be an unattached marker object")
+
+    pednr = getComponent(x, ids, checkUnique = TRUE, errorIfUnknown = TRUE)
     if(all(pednr == pednr[1]))
       x = x[[pednr[1]]]
-    else
-      stop2("Individuals from different pedigree components are not implemented yet")
+    else {
+      compRes = lapply(unique.default(pednr), function(i) {
+        idsC = ids[pednr == i]
+        lb = if(is.null(loopBreakers)) NULL else .myintersect(loopBreakers, x[[i]]$ID)
+        gs = if(is.null(grid.subset)) NULL else unique.matrix(grid.subset[, pednr == i, drop = FALSE])
+        oneMarkerDistribution(x[[i]], idsC, marker = marker, loopBreakers = lb, grid.subset = gs, verbose = FALSE)
+      })
+      res = Reduce(`%o%`, compRes)
+      return(formatResult(res))
+    }
   }
 
   if(!is.ped(x))
     stop2("Input is not a pedigree")
 
-  m = partialmarker
+  m = marker
 
   if (!is.marker(m)) {
     if(length(m) != 1)
-      stop2("`partialmarker` must have length 1")
+      stop2("`marker` must have length 1")
     m = getMarkers(x, markers = m)[[1]]
+  }
+
+  # Special case: Unconditional & all founders
+  # TODO: Generalisation to unrelated clusters - requires ribd!
+  if(length(ids) > 1 && all(m == 0) & all(ids %in% founders(x))) {
+    compRes = lapply(seq_along(ids), function(i) {
+      gs = if(is.null(grid.subset)) NULL else unique.matrix(grid.subset[, i, drop = FALSE])
+      oneMarkerDistribution(x, ids[i], marker = m, loopBreakers = loopBreakers,
+                            grid.subset = gs, output = "array", verbose = FALSE)
+    })
+    res = Reduce(`%o%`, compRes)
+    return(formatResult(res))
   }
 
   # Reorder if needed
@@ -164,5 +215,23 @@ oneMarkerDistribution = function(x, ids, partialmarker, loopBreakers = NULL,
   if(verbose)
     cat("\nAnalysis finished in", format(Sys.time() - st, digits = 3), "\n")
 
-  probs/marginal
+  res = probs/marginal
+  formatResult(res)
+}
+
+
+# Convert output array to data frame
+omd2df = function(arr, ids, sparse = FALSE) {
+  dn = dimnames(arr)
+  args = c(dn, stringsAsFactors = FALSE, KEEP.OUT.ATTRS = FALSE)
+  df = do.call(expand.grid, args)
+  names(df) = ids
+  df$prob = as.vector(arr)
+
+  if(sparse) {
+    df = df[df$prob > 0, , drop = FALSE]
+    rownames(df) = NULL
+  }
+
+  df
 }

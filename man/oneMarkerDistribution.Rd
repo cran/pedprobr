@@ -7,10 +7,11 @@
 oneMarkerDistribution(
   x,
   ids,
-  partialmarker,
+  marker = 1,
   loopBreakers = NULL,
-  eliminate = 0,
   grid.subset = NULL,
+  partialmarker = NULL,
+  output = c("array", "table", "sparse"),
   verbose = TRUE
 )
 }
@@ -19,15 +20,13 @@ oneMarkerDistribution(
 
 \item{ids}{A vector of ID labels of one or more members of \code{x}.}
 
-\item{partialmarker}{Either a \code{marker} object or the name (or index) of a
-marker attached to \code{x}. If \code{x} has multiple components, only the latter is
+\item{marker}{Either a \code{marker} object or the name (or index) of a marker
+attached to \code{x}. If \code{x} has multiple components, only the latter is
 allowed.}
 
 \item{loopBreakers}{(Only relevant if the pedigree has loops). A vector with
 ID labels of individuals to be used as loop breakers. If NULL (default)
-loop breakers are selected automatically. See \code{\link[=breakLoops]{breakLoops()}}.}
-
-\item{eliminate}{Deprecated, not used.}
+loop breakers are selected automatically. See \code{\link[pedtools:inbreedingLoops]{pedtools::breakLoops()}}.}
 
 \item{grid.subset}{(Optional; not relevant for most users.) A numeric matrix
 describing a subset of all marker genotype combinations for the \code{ids}
@@ -37,13 +36,25 @@ in terms of the matrix \code{M = allGenotypes(n)}, where \code{n} is the number 
 alleles for the marker. If the entry in column \code{j} is the integer \code{k}, this
 means that the genotype of individual \code{ids[j]} is row \code{k} of \code{M}.}
 
+\item{partialmarker}{(Deprecated) An alias for \code{marker}.}
+
+\item{output}{A character string, either \code{"array"} (default), "table" or
+"sparse". See Value.}
+
 \item{verbose}{A logical.}
 }
 \value{
-A named \code{k}-dimensional array, where \code{k = length(ids)}, with the
-joint genotype distribution for the \code{ids} individuals. The probabilities
-are conditional on the known genotypes and the allele frequencies of
-\code{partialmarker}.
+The output format depends on the \code{output} argument:
+\itemize{
+\item "array": A named \code{k}-dimensional array, where \code{k = length(ids)}, with the
+joint genotype distribution for the \code{ids} individuals, conditional on the
+known genotypes if present.
+\item "table": A data frame with \code{k+1} columns, where each row corresponds
+to a genotype combination, and the last column \code{prob} gives the
+probability.
+\item "sparse": A data frame with the same structure as the "table" output,
+but only combinations with non-zero probability are included.
+}
 }
 \description{
 Computes the genotype probability distribution of one or several pedigree
@@ -51,35 +62,41 @@ members, possibly conditional on known genotypes for the marker.
 }
 \examples{
 
-# Trivial example giving Hardy-Weinberg probabilities
-s = singleton(id = 1)
-m = marker(s, alleles = 1:2) # equifrequent SNP
-oneMarkerDistribution(s, ids = 1, partialmarker = m)
+# Trivial example: Hardy-Weinberg probabilities for an equifrequent SNP
+s = singleton(id = 1) |> addMarker(alleles = 1:2, afreq = c(0.5, 0.5))
+oneMarkerDistribution(s, ids = 1)
 
 # Conditioning on a partial genotype
-genotype(m, id = 1) = "1/-"
-oneMarkerDistribution(s, ids = 1, partialmarker = m)
+s = setGenotype(s, ids = 1, geno = "1/-")
+oneMarkerDistribution(s, ids = 1)
 
 # Genotype distribution for a child of heterozygous parents
-trio = nuclearPed(father = "fa", mother = "mo", child = "ch")
-m1 = marker(trio, fa = "1/2", mo = "1/2")
-oneMarkerDistribution(trio, ids = "ch", partialmarker = m1)
+trio = nuclearPed(father = "fa", mother = "mo", child = "ch") |>
+  addMarker(fa = "1/2", mo = "1/2")
+oneMarkerDistribution(trio, ids = "ch")
 
 # Joint distribution of the parents, given that the child is heterozygous
-m2 = marker(trio, ch = "1/2", afreq = c("1" = 0.5, "2" = 0.5))
-oneMarkerDistribution(trio, ids = c("fa", "mo"), partialmarker = m2)
+trio = addMarker(trio, ch = "1/2")
+ids = c("fa", "mo")
+oneMarkerDistribution(trio, ids = ids, marker = 2)
+
+# Table output of the previous example
+oneMarkerDistribution(trio, ids = ids, marker = 2, output = "table")
+oneMarkerDistribution(trio, ids = ids, marker = 2, output = "sparse")
 
 # A different example: The genotype distribution of an individual (id = 8)
 # whose half cousin (id = 9) is homozygous for a rare allele.
 y = halfCousinPed(degree = 1) |>
   addMarker("9" = "a/a", afreq = c(a = 0.01, b = 0.99))
 
-oneMarkerDistribution(y, ids = 8, partialmarker = 1)
+oneMarkerDistribution(y, ids = 8)
+
+# Multi-component (trivial) example
+z = singletons(1:2) |> addMarker(`1` = "1/2", `2` = "1/2", alleles = 1:2)
+oneMarkerDistribution(z, 1:2)
+oneMarkerDistribution(z, 1:2, output = "sparse")
 
 }
 \seealso{
 \code{\link[=twoMarkerDistribution]{twoMarkerDistribution()}}
-}
-\author{
-Magnus Dehli Vigeland
 }

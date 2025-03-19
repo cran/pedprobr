@@ -1,3 +1,20 @@
+# pedprobr 0.9.5
+
+* `oneMarkerDistribution()` now fully supports pedigrees with multiple components.
+
+* `oneMarkerDistribution()` has a new argument `output` taking values `"array"` (default, as before), `"table"`, or `"sparse"`. Both `"table"` and `"sparse"` produce data frames where each row corresponds to a genotype combination. The `"sparse"` format only includes combinations with non-zero probability.
+
+* In `oneMarkerDistribution()`, the argument `partialmarker` has been renamed to `marker`. The old name still works as an alias, but will be removed in a future version. While the old argument had no default value, the new defaults to the first attached marker. This simplifies the call in many cases, for example `singleton("A") |> addMarker() |> oneMarkerDistribution("A")`.
+
+* In `twoMarkerDistribution()`, the arguments `partialmarker1` and `partialmarker2` have been renamed to `marker1` and `marker2`, respectively.
+
+* Fixed bug affecting likelihood calculations in pedigrees with partial genotypes (e.g. `"1/-"`) in founders.
+
+* The function `allGenotypes()` is ~2-4 times faster due to a better implementation.
+
+* Updated dependencies: **pedtools** v2.6.0, **pedmut** v0.7.0.
+
+
 # pedprobr 0.9.4
 
 * Fixed rare bug in the peeling algorithm manifesting with reversed peeling order.
@@ -139,7 +156,7 @@ the call `likelihood(x, 1:2)` results in a vector of length 2 with the likelihoo
 of the first two markers attached to `x`. 
 
 * Recombination parameter `theta` is renamed to `rho` everywhere, to align 
-with other ped suite packages. `theta` still works, though.
+with other pedsuite packages.
 
 ## Other changes
 

@@ -25,9 +25,9 @@
 #' @param markers One or several markers compatible with `x`. Several input
 #'   forms are possible:
 #'
-#'   * A [marker()] object compatible with `x`.
+#'   * A `marker` object compatible with `x`.
 #'
-#'   * A list of marker objects.
+#'   * A list of `marker` objects.
 #'
 #'   * A vector of names or indices of markers attached to `x`. If `x` is a
 #'   list, this is the only valid input.
@@ -40,12 +40,11 @@
 #'   parameter exists mainly for debugging purposes.) The lumping algorithm will
 #'   detect (and complain) if any markers use a non-lumpable mutation model.
 #'   Default: TRUE.
-#' @param eliminate Deprecated, not used.
 #' @param logbase Either NULL (default) or a positive number indicating the
 #'   basis for logarithmic output. Typical values are `exp(1)` and 10.
 #' @param loopBreakers A vector of ID labels indicating loop breakers. If NULL
 #'   (default), automatic selection of loop breakers will be performed. See
-#'   [breakLoops()].
+#'   [pedtools::breakLoops()].
 #' @param peelOrder For internal use.
 #' @param allX For internal use; set to TRUE if all markers are X-chromosomal.
 #' @param verbose A logical.
@@ -121,8 +120,8 @@ likelihood = function(x, ...) UseMethod("likelihood", x)
 #' @export
 #' @rdname likelihood
 likelihood.ped = function(x, markers = NULL, peelOrder = NULL, lump = TRUE,
-                          eliminate = 0, logbase = NULL, loopBreakers = NULL,
-                          allX = NULL, verbose = FALSE, theta = 0, ...) {
+                          logbase = NULL, loopBreakers = NULL,allX = NULL,
+                          verbose = FALSE, theta = 0, ...) {
 
   if(theta > 0 && hasInbredFounders(x))
     stop2("Theta correction cannot be used in pedigrees with inbred founders")
