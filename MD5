@@ -1,13 +1,13 @@
-8384692b23af41684e7354da0a7c70b8 *DESCRIPTION
+6919874eed0c3d0c2640ce403b93c85f *DESCRIPTION
 90511abb54aa4118f8bda03779e69cbc *NAMESPACE
-8f05713e110ba8e5b7359e752246f42e *NEWS.md
+82cb14c5ea71e3bf82939cad3df7d8c2 *NEWS.md
 f22b3ea32c2f67556d0286fb8d57342e *R/buildGenolist.R
 bf0bd871e4b35a37e24011cc21534c25 *R/genoCombinations.R
 319d0a9540dc6ef100a9b6fa92b321ad *R/haldane.R
 a01debd0807fa8e0b4951733ddfcc6dd *R/informative.R
 164c8fcfef8c10ec4f75ffaecbd8060b *R/likelihood.R
 79731886cb1404aba063eee9afa74dd5 *R/likelihood2.R
-aeb9018ab016db0ac9dd7f9769739553 *R/lumpAlleles.R
+dfb506430481e35f51a99002710c7efd *R/lumpAlleles.R
 0712f90ea4516a946007630c7c6be8c3 *R/merlin.R
 2d593d1c0963113124b670f0b1185ce4 *R/oneMarkerDistribution.R
 24054853b84c1ab1877e3251912c6605 *R/pedprobr-package.R
@@ -17,7 +17,7 @@ b55431752b8df776c668be4aebaae68e *R/peel.R
 60e7f6fb0b3b72182c60cd4a83e9f0bd *R/thetaCorrection.R
 822240ae278fa4f6179d304afd344221 *R/twoMarkerDistribution.R
 33403a4c95aee5f8ac5b25eeb7ccfe20 *R/utils.R
-1b826fd9d1b8749755f714efa137984f *README.md
+a521d73dd0d9905379b6baa16fa82532 *README.md
 cb3b20077bebc5da31fc1b46c657c0ff *build/partial.rdb
 83ed975d2f0b5d635811ac9633c12175 *inst/CITATION
 eb5d422f3ed0c4da767fca845e262425 *man/HWprob.Rd
@@ -27,7 +27,7 @@ d931c6ca579545541d077f0dca6c0a8f *man/figures/logo.png
 a7ac2c496fd0fb4fef7c8402a17bd029 *man/genoCombinations.Rd
 cfd312d10fe479e14ad39af15c4e75c7 *man/haldane.Rd
 f6a79f50daff9e9c64fa953727f7bbf5 *man/likelihood.Rd
-0876ac9477e833e7caedea222d69e9ec *man/lumpAlleles.Rd
+fb68ba04d081b28492751da847b093b8 *man/lumpAlleles.Rd
 29e2f64c22d422ee57722d8205d9e565 *man/merlin.Rd
 df2c8301b555d35ee57754b39033d6cd *man/oneMarkerDistribution.Rd
 84bdde2a49dfdb4f1bcc3e204374b713 *man/pedprobr-package.Rd
