@@ -10,7 +10,6 @@ oneMarkerDistribution(
   marker = 1,
   loopBreakers = NULL,
   grid.subset = NULL,
-  partialmarker = NULL,
   output = c("array", "table", "sparse"),
   verbose = TRUE
 )
@@ -26,7 +25,7 @@ allowed.}
 
 \item{loopBreakers}{(Only relevant if the pedigree has loops). A vector with
 ID labels of individuals to be used as loop breakers. If NULL (default)
-loop breakers are selected automatically. See \code{\link[pedtools:inbreedingLoops]{pedtools::breakLoops()}}.}
+loop breakers are selected automatically. See \code{\link[pedtools:breakLoops]{pedtools::breakLoops()}}.}
 
 \item{grid.subset}{(Optional; not relevant for most users.) A numeric matrix
 describing a subset of all marker genotype combinations for the \code{ids}
@@ -35,8 +34,6 @@ individuals, and one row for each combination: The genotypes are described
 in terms of the matrix \code{M = allGenotypes(n)}, where \code{n} is the number of
 alleles for the marker. If the entry in column \code{j} is the integer \code{k}, this
 means that the genotype of individual \code{ids[j]} is row \code{k} of \code{M}.}
-
-\item{partialmarker}{(Deprecated) An alias for \code{marker}.}
 
 \item{output}{A character string, either \code{"array"} (default), "table" or
 "sparse". See Value.}

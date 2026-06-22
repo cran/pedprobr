@@ -115,36 +115,34 @@ startdata_MM = function(x, marker1, marker2, pedInfo = NULL) {
     g2 = glist2[[i]]
     len1 = length(g1$prob)
     len2 = length(g2$prob)
-    idx1 = rep(seq_len(len1), each = len2)
-    idx2 = rep(seq_len(len2), times = len1)
+    rep1 = function(z) rep(z, each = len2)
+    rep2 = function(z) rep.int(z, len1)
+    prob = as.numeric(rep1(g1$prob)*rep2(g2$prob))
 
-    # Same in all cases
-    prob = as.numeric(g1$prob[idx1] * g2$prob[idx2])
-
-    if(sum(prob == 0)) {
+    if(sum(prob) == 0) {
       imp = TRUE
       break
     }
 
     # Case 1: Hemizygous
     if(Xchrom && SEX[i] == 1) {
-      g = list(mat1 = g1$mat[idx1], mat2 = g2$mat[idx2], prob = prob)
+      g = list(mat1 = rep1(g1$mat), mat2 = rep2(g2$mat), prob = prob)
       glist[[i]] = .reduce(g)
       next
     }
 
     # Case 2: Simple founder
     if(!is.null(g1$allele)) {
-      g = list(allele1 = g1$allele[idx1], allele2 = g2$allele[idx2], prob = prob)
+      g = list(allele1 = rep1(g1$allele), allele2 = rep2(g2$allele), prob = prob)
       glist[[i]] = .reduce(g)
       next
     }
 
     # Main case
-    pat1 = g1$pat[idx1]
-    mat1 = g1$mat[idx1]
-    pat2 = g2$pat[idx2]
-    mat2 = g2$mat[idx2]
+    pat1 = rep1(g1$pat)
+    mat1 = rep1(g1$mat)
+    pat2 = rep2(g2$pat)
+    mat2 = rep2(g2$mat)
 
     # Doubly heterozygous founders: Include the other phase as well
     if (isFounder[i]) {
@@ -203,17 +201,23 @@ startdata_MM = function(x, marker1, marker2, pedInfo = NULL) {
 
 # Various info used repeatedly
 .pedInfo = function(x, treatAsFounder = NULL, Xchrom = FALSE) {
+
   nInd = length(x$ID)
+
+  LB = x$LOOP_BREAKERS
+  LBorig = if(is.null(LB)) integer(0) else LB[, "orig"]
+  LBcopy = if(is.null(LB)) integer(0) else LB[, "copy"]
 
   # Founders (except LB-copies): Genotypes need not be phased
   fouInt = founders(x, internal = TRUE)
   isFounder = logical(nInd)
   isFounder[fouInt] = TRUE
   isFounder[treatAsFounder] = TRUE
-  isFounder[x$LOOP_BREAKERS[, 2]] = FALSE
+  isFounder[LBcopy] = FALSE
 
   # Founders with 1 child
   simpleFou = isFounder & tabulate(c(x$FIDX, x$MIDX), nInd) == 1
+  simpleFou[LBorig] = FALSE
 
   # Founder inbreeding lookup vector; 0's for nonfounders
   fi = numeric(nInd)
