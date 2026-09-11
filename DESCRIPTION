@@ -1,7 +1,7 @@
 Type: Package
 Package: pedprobr
 Title: Probability Computations on Pedigrees
-Version: 1.1.0
+Version: 1.1.1
 Authors@R: 
     person("Magnus Dehli", "Vigeland", , "m.d.vigeland@medisin.uio.no", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-9134-4962"))
@@ -24,11 +24,11 @@ Encoding: UTF-8
 Language: en-GB
 SystemRequirements: MERLIN (https://csg.sph.umich.edu/abecasis/merlin/)
         for calculations involving multiple linked markers.
-Config/roxygen2/version: 8.0.0
+Config/roxygen2/version: 8.1.0
 NeedsCompilation: no
-Packaged: 2026-06-22 14:01:39 UTC; magnu
+Packaged: 2026-09-11 08:20:14 UTC; magnu
 Author: Magnus Dehli Vigeland [aut, cre] (ORCID:
     <https://orcid.org/0000-0002-9134-4962>)
 Maintainer: Magnus Dehli Vigeland <m.d.vigeland@medisin.uio.no>
 Repository: CRAN
-Date/Publication: 2026-06-22 15:50:02 UTC
+Date/Publication: 2026-09-11 09:00:02 UTC
